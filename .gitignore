@@ -9,3 +9,5 @@ uploads/*
 coverage/
 .vite/
 .pgdata/
+server/uploads/*
+!server/uploads/.gitkeep
