@@ -36,6 +36,8 @@ function buildCtx(facility, waiting, extra = {}) {
     facilityName: facility.name,
     dailySeq: waiting.daily_seq,
     totalCount: waiting.total_count,
+    /** 현재 입장대기 순서(큐 순번) */
+    waitOrder: waiting.queue_order ?? waiting.queueOrder ?? waiting.daily_seq,
     completeLink,
     cancelLink,
     postponeLink,
