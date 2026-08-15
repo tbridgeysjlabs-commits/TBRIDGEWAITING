@@ -11,6 +11,8 @@ import {
   templateDisplayName,
 } from './ppurioTemplates.js';
 
+/** @typedef {'MOCK'|'INSUFFICIENT_BALANCE'|'API_ERROR'|'EXCEPTION'|'SUCCESS'} KakaoSendReason */
+
 function clientOrigin() {
   return (process.env.CLIENT_ORIGIN || 'http://localhost:5173').replace(/\/$/, '');
 }
@@ -42,6 +44,25 @@ function buildCtx(facility, waiting, extra = {}) {
   };
 }
 
+function isPpurioBalanceError(sendResult) {
+  const blob = `${sendResult?.code || ''} ${sendResult?.message || ''} ${JSON.stringify(sendResult?.raw || {})}`;
+  return /잔액|한도|insufficient|balance|credit/i.test(blob);
+}
+
+/**
+ * @param {object} partial
+ * @returns {{ ok: boolean, reason: KakaoSendReason, detail?: string, mock?: boolean }}
+ */
+function withReason(partial) {
+  return {
+    ok: Boolean(partial.ok),
+    reason: partial.reason,
+    detail: partial.detail,
+    mock: partial.mock,
+    ...partial,
+  };
+}
+
 export const kakaoService = {
   buildLinks(waiting) {
     const completePath = waiting.complete_page_link || '';
@@ -66,22 +87,26 @@ export const kakaoService = {
         recipientPhone: waiting.phone,
         note: '충전금액 소진으로 발송 실패',
       });
-      return {
+      return withReason({
         ok: false,
+        reason: 'INSUFFICIENT_BALANCE',
+        detail: `balance=${balance}, unitCost=${unitCost}`,
         code: 'INSUFFICIENT_BALANCE',
         message: '충전금액이 소진되어 카카오 알림톡 발송이 불가합니다.',
         balance,
         unitCost,
-      };
+      });
     }
 
     if (!templateCode) {
       console.warn('[ppurio] missing template code for', templateKey);
-      return {
+      return withReason({
         ok: false,
+        reason: 'API_ERROR',
+        detail: `MISSING_TEMPLATE templateKey=${templateKey}`,
         code: 'MISSING_TEMPLATE',
         message: `템플릿 코드가 없습니다: ${templateKey}`,
-      };
+      });
     }
 
     const ctx = buildCtx(facility, waiting, extraCtx);
@@ -117,18 +142,79 @@ export const kakaoService = {
           error: sendResult.message,
         };
       } catch (err) {
+        const detail = String(err?.message || err);
+        console.error('[ppurio] send exception', detail);
         sendResult = {
           ok: false,
+          exception: true,
           code: 'PPURIO_ERROR',
-          message: String(err?.message || err),
+          message: detail,
         };
         payload.ppurio = sendResult;
       }
     } else {
-      console.log('[Kakao Alimtalk MOCK]', payload);
+      console.log('[Kakao Alimtalk MOCK] 테스트(MOCK) 모드 - 실제 미발송', payload);
+    }
+
+    if (!useLive) {
+      // MOCK: 잔액 차감·이력은 기존과 동일하게 기록하되 reason=MOCK
+      const sentAt = new Date();
+      payload.mockNote = '테스트(MOCK) 모드 - 실제 미발송';
+      await query(
+        `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+         VALUES ($1, $2, 'kakao', $3, 'sent')`,
+        [facility.id, waiting.id, JSON.stringify(payload)]
+      );
+      await waitingRepository.setKakaoSentAt(waiting.id, sentAt);
+      const after = await billingRepository.deductForSend(facility.id, waiting.id, unitCost, {
+        templateName: `${templateName} (MOCK)`,
+        recipientPhone: waiting.phone,
+        sendStatus: 'success',
+      });
+      const warningThreshold = Number(
+        after?.kakao_warning_threshold ?? facility.kakao_warning_threshold ?? 1000
+      );
+      const newBalance = Number(after?.kakao_balance ?? balance - unitCost);
+      return withReason({
+        ok: true,
+        reason: 'MOCK',
+        detail: '테스트(MOCK) 모드 - 실제 미발송',
+        mock: true,
+        payload,
+        sentAt,
+        balance: newBalance,
+        unitCost,
+        lowBalanceWarning: newBalance <= warningThreshold,
+      });
+    }
+
+    if (sendResult.exception) {
+      await billingRepository.logFailedSend(facility.id, waiting.id, unitCost, {
+        templateName,
+        recipientPhone: waiting.phone,
+        note: sendResult.message || '알림톡 발송 예외',
+      });
+      await query(
+        `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+         VALUES ($1, $2, 'kakao', $3, 'failed')`,
+        [facility.id, waiting.id, JSON.stringify(payload)]
+      );
+      return withReason({
+        ok: false,
+        reason: 'EXCEPTION',
+        detail: sendResult.message,
+        code: sendResult.code || 'EXCEPTION',
+        message: sendResult.message || '알림톡 발송 중 예외가 발생했습니다.',
+        balance,
+        unitCost,
+        payload,
+      });
     }
 
     if (!sendResult.ok) {
+      const balanceErr = isPpurioBalanceError(sendResult);
+      const reason = balanceErr ? 'INSUFFICIENT_BALANCE' : 'API_ERROR';
+      const detail = `code=${sendResult.code || ''} ${sendResult.message || ''}`.trim();
       await billingRepository.logFailedSend(facility.id, waiting.id, unitCost, {
         templateName,
         recipientPhone: waiting.phone,
@@ -139,14 +225,16 @@ export const kakaoService = {
          VALUES ($1, $2, 'kakao', $3, 'failed')`,
         [facility.id, waiting.id, JSON.stringify(payload)]
       );
-      return {
+      return withReason({
         ok: false,
+        reason,
+        detail,
         code: sendResult.code || 'SEND_FAILED',
         message: sendResult.message || '알림톡 발송에 실패했습니다.',
         balance,
         unitCost,
         payload,
-      };
+      });
     }
 
     const sentAt = new Date();
@@ -168,16 +256,17 @@ export const kakaoService = {
     );
     const newBalance = Number(after?.kakao_balance ?? balance - unitCost);
 
-    return {
+    return withReason({
       ok: true,
-      mock: !useLive,
+      reason: 'SUCCESS',
+      mock: false,
       payload,
       sentAt,
       balance: newBalance,
       unitCost,
       lowBalanceWarning: newBalance <= warningThreshold,
       messagekey: sendResult.messagekey,
-    };
+    });
   },
 
   async sendWaitingRegistered({ facility, waiting }) {
@@ -249,12 +338,21 @@ export const kakaoService = {
 
       if (!result.ok) {
         await waitingRepository.clearImminentNotified(claimed.id);
-        console.warn('[imminent notify] send failed', result.code || result.message);
+        console.warn(
+          '[imminent notify] send failed',
+          result.reason,
+          result.detail || result.code || result.message
+        );
       }
       return result;
     } catch (err) {
       console.error('[imminent notify] unexpected error', err);
-      return { ok: false, error: String(err?.message || err) };
+      return withReason({
+        ok: false,
+        reason: 'EXCEPTION',
+        detail: String(err?.message || err),
+        error: String(err?.message || err),
+      });
     }
   },
 };

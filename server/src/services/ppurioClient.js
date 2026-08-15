@@ -55,6 +55,23 @@ async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** /v1/token 호출 직전 — 이 서버의 아웃바운드 공인 IP 확인용 (IP 화이트리스트 디버깅) */
+async function logOutboundPublicIp() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch('https://api.ipify.org?format=json', {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => ({}));
+    const ip = data.ip || '(unknown)';
+    console.log('[outbound IP]', ip);
+  } catch (err) {
+    console.warn('[outbound IP] lookup failed:', String(err?.message || err));
+  }
+}
+
 async function fetchJson(url, options, { retries = 2 } = {}) {
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
@@ -75,6 +92,8 @@ async function fetchJson(url, options, { retries = 2 } = {}) {
 async function fetchAccessToken() {
   const base = apiBase();
   if (!base) throw new Error('[ppurio] PPURIO_API_BASE_URL 이 비어 있습니다.');
+
+  await logOutboundPublicIp();
 
   const account = process.env.PPURIO_ACCOUNT;
   const authKey = process.env.PPURIO_AUTH_KEY;

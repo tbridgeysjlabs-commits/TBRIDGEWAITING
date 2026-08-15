@@ -5,6 +5,7 @@ import { waitingRepository } from '../repositories/waitingRepository.js';
 import { billingRepository } from '../repositories/billingRepository.js';
 import { paymentRepository } from '../repositories/paymentRepository.js';
 import { nicepayService } from './nicepayService.js';
+import { isPpurioConfigured } from './ppurioClient.js';
 import { createError } from '../middleware/errorHandler.js';
 import crypto from 'crypto';
 
@@ -62,6 +63,9 @@ function toPublicFacility(row, lang = 'ko') {
     kakaoWarningThreshold: warning,
     lowBalanceWarning: balance > 0 && balance <= warning,
     insufficientBalance: balance < Number(row.kakao_unit_cost || 20),
+    /** live=실발송, mock=PPURIO_* 미설정으로 실제 미발송 */
+    kakaoAlimtalkMode: isPpurioConfigured() ? 'live' : 'mock',
+    kakaoAlimtalkLive: isPpurioConfigured(),
     status,
     statusLabel: status === 'withdraw' || status === 'inactive' ? '탈퇴' : '활성',
     createdAt: row.created_at,
@@ -279,6 +283,8 @@ export const facilityService = {
           Number(facility.kakao_warning_threshold || 1000),
       insufficientBalance:
         Number(facility.kakao_balance || 0) < Number(facility.kakao_unit_cost || 20),
+      kakaoAlimtalkMode: isPpurioConfigured() ? 'live' : 'mock',
+      kakaoAlimtalkLive: isPpurioConfigured(),
     };
   },
 

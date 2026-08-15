@@ -5,6 +5,24 @@ import { customerRepository } from '../repositories/customerRepository.js';
 import { kakaoService } from './kakaoService.js';
 import { createError } from '../middleware/errorHandler.js';
 
+function toastForRegisterKakao(kakaoResult) {
+  switch (kakaoResult?.reason) {
+    case 'SUCCESS':
+      return '웨이팅 등록 완료! 카카오 알림톡을 발송했어요.';
+    case 'MOCK':
+      return '웨이팅 등록 완료!';
+    case 'INSUFFICIENT_BALANCE':
+      return '웨이팅 등록 완료! (알림톡 잔액 부족으로 발송되지 않았습니다.)';
+    case 'API_ERROR':
+    case 'EXCEPTION':
+      return '웨이팅 등록 완료! (알림톡 발송 중 오류가 발생했습니다. 관리자에게 문의해주세요.)';
+    default:
+      if (kakaoResult?.ok && kakaoResult?.mock) return '웨이팅 등록 완료!';
+      if (kakaoResult?.ok) return '웨이팅 등록 완료! 카카오 알림톡을 발송했어요.';
+      return '웨이팅 등록 완료! (알림톡 발송 중 오류가 발생했습니다. 관리자에게 문의해주세요.)';
+  }
+}
+
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
@@ -220,9 +238,7 @@ export const waitingService = {
       waiting: { ...mapWaiting(waiting), order: position },
       completePageLink,
       kakao: kakaoResult,
-      toast: kakaoResult.ok
-        ? '웨이팅 등록 완료! 카카오 알림톡을 발송했어요.'
-        : '웨이팅 등록 완료! (알림톡 잔액 부족으로 발송되지 않았습니다.)',
+      toast: toastForRegisterKakao(kakaoResult),
     };
   },
 
