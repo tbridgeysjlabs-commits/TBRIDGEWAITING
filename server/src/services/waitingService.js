@@ -64,6 +64,8 @@ function mapWaiting(row, index = 0) {
   const completePageLink =
     row.complete_page_link ||
     (facilityCode ? `/w/${facilityCode}/complete/${row.id}` : null);
+  const cancelPageLink = completePageLink ? `${completePageLink}/cancel` : null;
+  const postponePageLink = completePageLink ? `${completePageLink}/postpone` : null;
 
   return {
     id: row.id,
@@ -78,6 +80,7 @@ function mapWaiting(row, index = 0) {
     status: row.status,
     statusLabel: statusLabel(row.status),
     marketingAgreed: row.marketing_agreed,
+    termsAgreed: row.terms_agreed ?? row.marketing_agreed,
     registeredAt: row.registered_at,
     completedAt: row.completed_at,
     cancelledAt: row.cancelled_at,
@@ -89,9 +92,17 @@ function mapWaiting(row, index = 0) {
     totalWaitSeconds,
     endLabel: endLabel(row),
     completePageLink,
+    cancelPageLink,
+    postponePageLink,
     postponeCount: row.postpone_count || 0,
     queueOrder: row.queue_order,
     kakaoSentAt: row.kakao_sent_at,
+    calledAt: row.called_at || null,
+    callDeadlineAt: row.call_deadline_at || null,
+    isCalling: Boolean(row.called_at && row.call_deadline_at),
+    isCallMissed:
+      Boolean(row.called_at && row.call_deadline_at) &&
+      new Date(row.call_deadline_at).getTime() <= Date.now(),
   };
 }
 
@@ -117,11 +128,44 @@ export const waitingService = {
       waitingRepository.listByStatus(facility.id, 'cancelled'),
     ]);
 
+    const mappedPending = pending.map((r, i) => mapWaiting(r, i));
+    const currentlyCalled = mappedPending
+      .filter((w) => w.calledAt)
+      .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
+
     return {
       counts,
-      pending: pending.map((r, i) => mapWaiting(r, i)),
+      entryWaitMinutes: Math.max(1, Number(facility.entry_wait_minutes || 5)),
+      currentlyCalled,
+      pending: mappedPending,
       completed: completed.map((r, i) => mapWaiting(r, i)),
       cancelled: cancelled.map((r, i) => mapWaiting(r, i)),
+    };
+  },
+
+  async call(facilityCode, waitingId) {
+    const facility = await resolveFacility(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    const existing = await waitingRepository.findById(waitingId);
+    if (!existing || existing.facility_id !== facility.id) {
+      throw createError(404, '대기 정보를 찾을 수 없습니다.');
+    }
+    if (existing.status !== 'pending') {
+      throw createError(400, '대기 중인 항목만 호출할 수 있습니다.');
+    }
+
+    const minutes = Math.max(1, Number(facility.entry_wait_minutes || 5));
+    const deadlineAt = new Date(Date.now() + minutes * 60 * 1000);
+    const updated = await waitingRepository.call(waitingId, deadlineAt);
+    if (!updated) throw createError(400, '대기 중인 항목만 호출할 수 있습니다.');
+
+    void kakaoService.sendCallEntry({ facility, waiting: updated });
+    void kakaoService.notifyImminentEntries(facility);
+
+    return {
+      waiting: mapWaiting(updated),
+      entryWaitMinutes: minutes,
+      toast: `${updated.daily_seq}번 팀을 호출했습니다.`,
     };
   },
 
@@ -133,7 +177,8 @@ export const waitingService = {
     if (!isValidPhone(phone)) {
       throw createError(400, '올바른 휴대폰 번호를 입력해 주세요.');
     }
-    if (!payload.termsAgreed || !payload.privacyAgreed) {
+    const termsAgreed = !!(payload.termsAgreed ?? payload.privacyAgreed);
+    if (!termsAgreed) {
       throw createError(400, '필수 약관에 동의해 주세요.');
     }
 
@@ -149,7 +194,9 @@ export const waitingService = {
       phone,
       partyCounts,
       totalCount,
-      marketingAgreed: !!payload.marketingAgreed,
+      termsAgreed: true,
+      // 마케팅 별도 동의 폐지 — 이력 컬럼은 유지하되 신규는 false
+      marketingAgreed: false,
       queueOrder,
       completePageLink: null,
     });
@@ -160,7 +207,7 @@ export const waitingService = {
     await customerRepository.upsert({
       facilityId: facility.id,
       phone,
-      marketingAgreed: !!payload.marketingAgreed,
+      marketingAgreed: false,
       registeredAt: waiting.registered_at,
     });
 
@@ -197,6 +244,9 @@ export const waitingService = {
         name: facility.name,
         profileImageUrl: facility.profile_image_url,
         facilityCode: facility.facility_code,
+        brandDisplayMode:
+          facility.brand_display_mode === 'image' ? 'image' : 'image_text',
+        theme: facility.theme === 'dark' ? 'dark' : 'light',
         postponePolicy,
         postponeLimit,
       },
@@ -229,6 +279,7 @@ export const waitingService = {
     const updated = await waitingRepository.complete(waitingId);
     if (!updated) throw createError(400, '대기 중인 항목만 완료 처리할 수 있습니다.');
     await waitingRepository.renumberPendingQueue(facility.id);
+    void kakaoService.notifyImminentEntries(facility);
     return {
       waiting: mapWaiting(updated),
       toast: '대기완료 리스트로 이동하였습니다.',
@@ -253,7 +304,10 @@ export const waitingService = {
 
     const updated = await waitingRepository.cancel(waitingId, { status, cancelledBy });
     if (!updated) throw createError(400, '대기 중인 항목만 취소할 수 있습니다.');
+    await waitingRepository.clearImminentNotified(waitingId);
     await waitingRepository.renumberPendingQueue(facility.id);
+    void kakaoService.sendCancel({ facility, waiting: updated, reason });
+    void kakaoService.notifyImminentEntries(facility);
     return {
       waiting: mapWaiting(updated),
       toast: '대기취소 리스트로 이동하였습니다.',
@@ -304,6 +358,17 @@ export const waitingService = {
     }
     await waitingRepository.incrementPostpone(waitingId);
 
+    const newIndex = pending.findIndex((w) => w.id === waitingId);
+    const newOrder = newIndex >= 0 ? newIndex + 1 : pending.length;
+    const postponed = await waitingRepository.findById(waitingId);
+    if (postponed) {
+      void kakaoService.sendPostponeDone({
+        facility,
+        waiting: postponed,
+        newOrder,
+      });
+    }
+    void kakaoService.notifyImminentEntries(facility);
     return this.getCompletePage(facilityCode, waitingId);
   },
 

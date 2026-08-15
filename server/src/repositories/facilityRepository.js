@@ -14,12 +14,12 @@ export const facilityRepository = {
 
   async findByCode(facilityCode) {
     const { rows } = await query(
-      `SELECT f.*, fs.profile_image_url, fs.terms_of_use, fs.privacy_policy,
-              fs.marketing_policy, fs.enabled_languages, fs.signage_template_key,
+      `SELECT f.*, fs.profile_image_url,
+              fs.terms_of_use, fs.terms_of_use_en, fs.terms_of_use_ja, fs.terms_of_use_zh,
+              fs.enabled_languages, fs.signage_template_key,
               fs.postpone_policy, fs.postpone_limit,
-              fs.terms_of_use_en, fs.terms_of_use_ja, fs.terms_of_use_zh,
-              fs.privacy_policy_en, fs.privacy_policy_ja, fs.privacy_policy_zh,
-              fs.marketing_policy_en, fs.marketing_policy_ja, fs.marketing_policy_zh
+              fs.brand_display_mode, fs.theme, fs.entry_wait_minutes,
+              fs.waiting_notification_order
        FROM facilities f
        LEFT JOIN facility_settings fs ON fs.facility_id = f.id
        WHERE f.facility_code = $1`,
@@ -64,16 +64,10 @@ export const facilityRepository = {
   async createDefaults(facilityId) {
     await query(
       `INSERT INTO facility_settings (
-         facility_id, terms_of_use, privacy_policy, marketing_policy,
-         postpone_policy, postpone_limit
-       ) VALUES ($1, $2, $3, $4, 'none', 3)
+         facility_id, terms_of_use, postpone_policy, postpone_limit
+       ) VALUES ($1, $2, 'none', 3)
        ON CONFLICT (facility_id) DO NOTHING`,
-      [
-        facilityId,
-        '이용 약관을 입력해 주세요.',
-        '개인정보 수집 및 이용 약관을 입력해 주세요.',
-        '마케팅 약관을 입력해 주세요.',
-      ]
+      [facilityId, '약관을 입력해 주세요.']
     );
     await query(
       `INSERT INTO facility_signages (facility_id, template_key)
@@ -95,43 +89,39 @@ export const facilityRepository = {
       `UPDATE facility_settings SET
          profile_image_url = COALESCE($2, profile_image_url),
          terms_of_use = COALESCE($3, terms_of_use),
-         privacy_policy = COALESCE($4, privacy_policy),
-         marketing_policy = COALESCE($5, marketing_policy),
-         enabled_languages = COALESCE($6, enabled_languages),
-         signage_template_key = COALESCE($7, signage_template_key),
-         postpone_policy = COALESCE($8, postpone_policy),
-         postpone_limit = COALESCE($9, postpone_limit),
-         terms_of_use_en = COALESCE($10, terms_of_use_en),
-         terms_of_use_ja = COALESCE($11, terms_of_use_ja),
-         terms_of_use_zh = COALESCE($12, terms_of_use_zh),
-         privacy_policy_en = COALESCE($13, privacy_policy_en),
-         privacy_policy_ja = COALESCE($14, privacy_policy_ja),
-         privacy_policy_zh = COALESCE($15, privacy_policy_zh),
-         marketing_policy_en = COALESCE($16, marketing_policy_en),
-         marketing_policy_ja = COALESCE($17, marketing_policy_ja),
-         marketing_policy_zh = COALESCE($18, marketing_policy_zh),
+         enabled_languages = COALESCE($4, enabled_languages),
+         signage_template_key = COALESCE($5, signage_template_key),
+         postpone_policy = COALESCE($6, postpone_policy),
+         postpone_limit = COALESCE($7, postpone_limit),
+         terms_of_use_en = COALESCE($8, terms_of_use_en),
+         terms_of_use_ja = COALESCE($9, terms_of_use_ja),
+         terms_of_use_zh = COALESCE($10, terms_of_use_zh),
+         brand_display_mode = COALESCE($11, brand_display_mode),
+         theme = COALESCE($12, theme),
+         entry_wait_minutes = COALESCE($13, entry_wait_minutes),
+         waiting_notification_order = CASE
+           WHEN $14::boolean THEN $15::int
+           ELSE waiting_notification_order
+         END,
          updated_at = NOW()
        WHERE facility_id = $1
        RETURNING *`,
       [
         facilityId,
         data.profileImageUrl ?? null,
-        data.termsOfUse ?? data.termsOfUseKo ?? null,
-        data.privacyPolicy ?? data.privacyPolicyKo ?? null,
-        data.marketingPolicy ?? data.marketingPolicyKo ?? null,
+        data.terms ?? data.termsOfUse ?? data.termsOfUseKo ?? null,
         data.enabledLanguages ?? null,
         data.signageTemplateKey ?? null,
         data.postponePolicy ?? null,
         data.postponeLimit ?? null,
-        data.termsOfUseEn ?? null,
-        data.termsOfUseJa ?? null,
-        data.termsOfUseZh ?? null,
-        data.privacyPolicyEn ?? null,
-        data.privacyPolicyJa ?? null,
-        data.privacyPolicyZh ?? null,
-        data.marketingPolicyEn ?? null,
-        data.marketingPolicyJa ?? null,
-        data.marketingPolicyZh ?? null,
+        data.termsEn ?? data.termsOfUseEn ?? null,
+        data.termsJa ?? data.termsOfUseJa ?? null,
+        data.termsZh ?? data.termsOfUseZh ?? null,
+        data.brandDisplayMode ?? null,
+        data.theme ?? null,
+        data.entryWaitMinutes ?? null,
+        Object.prototype.hasOwnProperty.call(data, 'waitingNotificationOrder'),
+        data.waitingNotificationOrder ?? null,
       ]
     );
     return rows[0];

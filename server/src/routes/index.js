@@ -47,6 +47,12 @@ router.post(
   waitingController.complete
 );
 router.post(
+  '/admin/:facilityCode/waitings/:waitingId/call',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  waitingController.call
+);
+router.post(
   '/admin/:facilityCode/waitings/:waitingId/cancel',
   requireAuth(['facility_admin', 'system_admin']),
   requireFacilityMatch(),
@@ -125,6 +131,15 @@ router.post(
   requireFacilityMatch(),
   facilityController.charge
 );
+router.post(
+  '/admin/:facilityCode/billing/charge/prepare',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  facilityController.prepareCharge
+);
+// NicePay 인증결과 수신 (브라우저 form POST, JWT 없음)
+router.post('/billing/nicepay/return', facilityController.nicepayReturn);
+router.get('/billing/nicepay/return', facilityController.nicepayReturn);
 router.get(
   '/admin/:facilityCode/billing/sends',
   requireAuth(['facility_admin', 'system_admin']),
@@ -173,6 +188,11 @@ router.get(
   '/system-admin/billing/charges',
   requireAuth(['system_admin']),
   facilityController.systemListCharges
+);
+router.post(
+  '/system-admin/billing/charges/:id/cancel',
+  requireAuth(['system_admin']),
+  facilityController.cancelCharge
 );
 
 export default router;

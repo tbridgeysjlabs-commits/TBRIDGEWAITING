@@ -128,9 +128,9 @@ export const waitingRepository = {
     const { rows } = await query(
       `INSERT INTO waitings (
          facility_id, daily_seq, phone, party_counts, total_count,
-         status, marketing_agreed, registered_at, entry_date,
+         status, marketing_agreed, terms_agreed, registered_at, entry_date,
          queue_order, complete_page_link, postpone_count
-       ) VALUES ($1,$2,$3,$4,$5,'pending',$6,NOW(),CURRENT_DATE,$7,$8,0)
+       ) VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,NOW(),CURRENT_DATE,$8,$9,0)
        RETURNING *`,
       [
         data.facilityId,
@@ -139,6 +139,7 @@ export const waitingRepository = {
         JSON.stringify(data.partyCounts),
         data.totalCount,
         data.marketingAgreed,
+        data.termsAgreed ?? true,
         data.queueOrder,
         data.completePageLink,
       ]
@@ -186,6 +187,19 @@ export const waitingRepository = {
     return rows[0] || null;
   },
 
+  async call(id, deadlineAt) {
+    const { rows } = await query(
+      `UPDATE waitings
+       SET called_at = NOW(),
+           call_deadline_at = $2,
+           updated_at = NOW()
+       WHERE id = $1 AND status = 'pending'
+       RETURNING *`,
+      [id, deadlineAt]
+    );
+    return rows[0] || null;
+  },
+
   async cancel(id, { status = 'cancelled', cancelledBy = 'customer' } = {}) {
     const { rows } = await query(
       `UPDATE waitings
@@ -219,6 +233,30 @@ export const waitingRepository = {
       [id, queueOrder]
     );
     return rows[0];
+  },
+
+  async markImminentNotified(id) {
+    const { rows } = await query(
+      `UPDATE waitings
+       SET notified_imminent_entry = TRUE, updated_at = NOW()
+       WHERE id = $1
+         AND status = 'pending'
+         AND notified_imminent_entry = FALSE
+       RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
+  },
+
+  async clearImminentNotified(id) {
+    const { rows } = await query(
+      `UPDATE waitings
+       SET notified_imminent_entry = FALSE, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
   },
 
   async renumberPendingQueue(facilityId) {

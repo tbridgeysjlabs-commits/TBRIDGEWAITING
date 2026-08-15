@@ -104,6 +104,91 @@ async function migrate() {
   await addColumn('usage_history', 'send_status', `VARCHAR(20)`);
   await addColumn('usage_history', 'payment_method', `VARCHAR(100)`);
   await addColumn('usage_history', 'receipt_url', `TEXT`);
+  await addColumn('usage_history', 'cancelled_at', 'TIMESTAMPTZ');
+  await addColumn('usage_history', 'cancelled_amount', 'NUMERIC(12,2)');
+
+  await addColumn(
+    'facility_settings',
+    'brand_display_mode',
+    `VARCHAR(30) NOT NULL DEFAULT 'image_text'`
+  );
+  await addColumn(
+    'facility_settings',
+    'theme',
+    `VARCHAR(20) NOT NULL DEFAULT 'light'`
+  );
+  await addColumn(
+    'facility_settings',
+    'entry_wait_minutes',
+    'INT NOT NULL DEFAULT 5'
+  );
+  await addColumn(
+    'facility_settings',
+    'waiting_notification_order',
+    'INT'
+  );
+
+  // waiting call / entry countdown
+  await addColumn('waitings', 'called_at', 'TIMESTAMPTZ');
+  await addColumn('waitings', 'call_deadline_at', 'TIMESTAMPTZ');
+  await addColumn(
+    'waitings',
+    'notified_imminent_entry',
+    'BOOLEAN NOT NULL DEFAULT FALSE'
+  );
+
+  // 약관 3종 → 단일 terms_of_use 통합 (기존 privacy/marketing 본문을 합친 뒤 비움)
+  await addColumn('waitings', 'terms_agreed', 'BOOLEAN NOT NULL DEFAULT FALSE');
+  await query(`
+    UPDATE waitings
+    SET terms_agreed = TRUE
+    WHERE terms_agreed = FALSE AND marketing_agreed = TRUE
+  `).catch(() => {});
+
+  const mergePair = async (target, privacyCol, marketingCol) => {
+    await query(`
+      UPDATE facility_settings SET
+        ${target} = TRIM(BOTH E'\\n' FROM CONCAT_WS(E'\\n\\n',
+          NULLIF(TRIM(${target}), ''),
+          NULLIF(TRIM(${privacyCol}), ''),
+          NULLIF(TRIM(${marketingCol}), '')
+        )),
+        ${privacyCol} = '',
+        ${marketingCol} = ''
+      WHERE TRIM(COALESCE(${privacyCol}, '')) <> ''
+         OR TRIM(COALESCE(${marketingCol}, '')) <> ''
+    `);
+  };
+  await mergePair('terms_of_use', 'privacy_policy', 'marketing_policy');
+  await mergePair('terms_of_use_en', 'privacy_policy_en', 'marketing_policy_en');
+  await mergePair('terms_of_use_ja', 'privacy_policy_ja', 'marketing_policy_ja');
+  await mergePair('terms_of_use_zh', 'privacy_policy_zh', 'marketing_policy_zh');
+  console.log('~ facility_settings terms merged into terms_of_use*');
+
+  // NicePay charge tracking
+  await addColumn('usage_history', 'pg_tid', 'VARCHAR(40)');
+  await addColumn('usage_history', 'pg_moid', 'VARCHAR(64)');
+  await query(`
+    CREATE TABLE IF NOT EXISTS payment_orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+      moid VARCHAR(64) NOT NULL UNIQUE,
+      amount NUMERIC(12,2) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'paid', 'failed', 'cancelled')),
+      tid VARCHAR(40),
+      pay_method VARCHAR(30),
+      auth_code VARCHAR(40),
+      raw_response JSONB,
+      usage_history_id UUID REFERENCES usage_history(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_payment_orders_facility
+     ON payment_orders(facility_id, created_at DESC)`
+  );
 
   await query(
     `CREATE INDEX IF NOT EXISTS idx_usage_history_facility_date

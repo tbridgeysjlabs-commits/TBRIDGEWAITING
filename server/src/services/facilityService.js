@@ -3,7 +3,10 @@ import { facilityRepository } from '../repositories/facilityRepository.js';
 import { waitingTypeRepository } from '../repositories/waitingTypeRepository.js';
 import { waitingRepository } from '../repositories/waitingRepository.js';
 import { billingRepository } from '../repositories/billingRepository.js';
+import { paymentRepository } from '../repositories/paymentRepository.js';
+import { nicepayService } from './nicepayService.js';
 import { createError } from '../middleware/errorHandler.js';
+import crypto from 'crypto';
 
 function pickTerm(row, base, lang) {
   if (lang === 'en') return row[`${base}_en`] || row[base] || '';
@@ -31,25 +34,29 @@ function toPublicFacility(row, lang = 'ko') {
     profileImageUrl: row.profile_image_url,
     adminContact: row.admin_contact || '',
     kakaoSenderKey: row.kakao_sender_key,
+    terms: pickTerm(row, 'terms_of_use', lang),
+    termsKo: row.terms_of_use || '',
+    termsEn: row.terms_of_use_en || '',
+    termsJa: row.terms_of_use_ja || '',
+    termsZh: row.terms_of_use_zh || '',
+    // 하위 호환 별칭
     termsOfUse: pickTerm(row, 'terms_of_use', lang),
-    privacyPolicy: pickTerm(row, 'privacy_policy', lang),
-    marketingPolicy: pickTerm(row, 'marketing_policy', lang),
     termsOfUseKo: row.terms_of_use || '',
     termsOfUseEn: row.terms_of_use_en || '',
     termsOfUseJa: row.terms_of_use_ja || '',
     termsOfUseZh: row.terms_of_use_zh || '',
-    privacyPolicyKo: row.privacy_policy || '',
-    privacyPolicyEn: row.privacy_policy_en || '',
-    privacyPolicyJa: row.privacy_policy_ja || '',
-    privacyPolicyZh: row.privacy_policy_zh || '',
-    marketingPolicyKo: row.marketing_policy || '',
-    marketingPolicyEn: row.marketing_policy_en || '',
-    marketingPolicyJa: row.marketing_policy_ja || '',
-    marketingPolicyZh: row.marketing_policy_zh || '',
     enabledLanguages: row.enabled_languages || ['ko'],
+    brandDisplayMode: row.brand_display_mode === 'image' ? 'image' : 'image_text',
+    theme: row.theme === 'dark' ? 'dark' : 'light',
     signageTemplateKey: row.signage_template_key || 'basic',
     postponePolicy: row.postpone_policy || 'none',
     postponeLimit: Number(row.postpone_limit || 3),
+    entryWaitMinutes: Math.max(1, Number(row.entry_wait_minutes || 5)),
+    waitingNotificationOrder:
+      row.waiting_notification_order == null ||
+      Number(row.waiting_notification_order) < 1
+        ? null
+        : Number(row.waiting_notification_order),
     kakaoBalance: balance,
     kakaoUnitCost: Number(row.kakao_unit_cost || 20),
     kakaoWarningThreshold: warning,
@@ -150,6 +157,35 @@ export const facilityService = {
     ) {
       throw createError(400, '잘못된 미루기 정책입니다.');
     }
+    if (
+      data.brandDisplayMode != null &&
+      !['image_text', 'image'].includes(data.brandDisplayMode)
+    ) {
+      throw createError(400, '잘못된 시설사 표시 방식입니다.');
+    }
+    if (data.theme != null && !['light', 'dark'].includes(data.theme)) {
+      throw createError(400, '잘못된 테마입니다.');
+    }
+    if (data.entryWaitMinutes != null) {
+      const minutes = Number(data.entryWaitMinutes);
+      if (!Number.isInteger(minutes) || minutes < 1) {
+        throw createError(400, '입장 대기 시간은 1분 이상이어야 합니다.');
+      }
+      data.entryWaitMinutes = minutes;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'waitingNotificationOrder')) {
+      const raw = data.waitingNotificationOrder;
+      if (raw === '' || raw == null || Number(raw) === 0) {
+        data.waitingNotificationOrder = null;
+      } else {
+        const order = Number(raw);
+        if (!Number.isInteger(order) || order < 1) {
+          throw createError(400, '입장 대기 알림 순번은 1 이상 정수여야 합니다.');
+        }
+        data.waitingNotificationOrder = order;
+      }
+    }
 
     // profileImageUrl empty string means clear
     const settingsPayload = { ...data };
@@ -247,12 +283,16 @@ export const facilityService = {
   },
 
   async charge(facilityCode, amount, options = {}) {
+    // 직접 충전은 MOCK 허용 시에만 (나이스페이 우회 방지)
+    if (nicepayService.isConfigured() && process.env.NICEPAY_ALLOW_MOCK !== '1') {
+      throw createError(400, '나이스페이 결제를 이용해 충전해 주세요.');
+    }
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
     const value = Number(amount);
     if (!value || value <= 0) throw createError(400, '충전 금액을 확인해 주세요.');
-    const updated = await billingRepository.charge(facility.id, value, {
-      note: options.note || '알림톡 충전',
+    const { facility: updated } = await billingRepository.charge(facility.id, value, {
+      note: options.note || '알림톡 충전(MOCK)',
       paymentMethod: options.paymentMethod || '카드(MOCK)',
       receiptUrl: options.receiptUrl,
     });
@@ -266,7 +306,180 @@ export const facilityService = {
     };
   },
 
+  async prepareNicepayCharge(facilityCode, amount) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 1000) {
+      throw createError(400, '충전 금액은 1,000원 이상이어야 합니다.');
+    }
+    if (!nicepayService.isConfigured()) {
+      throw createError(500, '나이스페이 설정(NICEPAY_MID/KEY)이 필요합니다.');
+    }
+
+    const moid = `TB${Date.now()}${crypto.randomBytes(3).toString('hex')}`.slice(0, 64);
+    await paymentRepository.createOrder({
+      facilityId: facility.id,
+      moid,
+      amount: value,
+    });
+
+    const pay = nicepayService.createPreparePayload({
+      amount: value,
+      moid,
+      facilityCode: facility.facility_code,
+      facilityName: facility.name,
+      buyerName: facility.name,
+      buyerTel: facility.admin_contact,
+    });
+
+    return {
+      provider: 'nicepay',
+      order: { moid, amount: value },
+      pay,
+    };
+  },
+
+  async handleNicepayReturn(body = {}) {
+    const authResultCode = String(body.AuthResultCode || '');
+    const moid = body.Moid || body.moid;
+    const amt = String(body.Amt || '');
+    const mid = body.MID || body.mid;
+    const authToken = body.AuthToken;
+    const txTid = body.TxTid || body.TID;
+    const signature = body.Signature;
+    const nextAppURL = body.NextAppURL;
+    const netCancelURL = body.NetCancelURL;
+    const facilityCodeFromReserved = body.ReqReserved || '';
+
+    const order = moid ? await paymentRepository.findByMoid(moid) : null;
+    const facilityCode = order?.facility_code || facilityCodeFromReserved || 'demo-park';
+
+    if (!order) {
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: '주문 정보를 찾을 수 없습니다.',
+          moid,
+        }),
+      };
+    }
+
+    if (order.status === 'paid') {
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'success',
+          message: '이미 처리된 결제입니다.',
+          moid,
+        }),
+      };
+    }
+
+    if (authResultCode !== '0000') {
+      await paymentRepository.markFailed(moid, body);
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: body.AuthResultMsg || '결제 인증에 실패했습니다.',
+          moid,
+        }),
+      };
+    }
+
+    if (Number(order.amount) !== Number(amt)) {
+      await paymentRepository.markFailed(moid, { ...body, error: 'AMOUNT_mismatch' });
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: '결제 금액이 일치하지 않습니다.',
+          moid,
+        }),
+      };
+    }
+
+    if (
+      !nicepayService.verifyAuthResponseSignature(authToken, mid, amt, signature)
+    ) {
+      await paymentRepository.markFailed(moid, { ...body, error: 'signature_mismatch' });
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: '결제 위변조 검증에 실패했습니다.',
+          moid,
+        }),
+      };
+    }
+
+    const { result } = await nicepayService.approve({
+      tid: txTid,
+      authToken,
+      mid,
+      amt,
+      nextAppURL,
+      netCancelURL,
+    });
+
+    if (!nicepayService.isApproveSuccess(result)) {
+      await paymentRepository.markFailed(moid, result);
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: result?.ResultMsg || '결제 승인에 실패했습니다.',
+          moid,
+        }),
+      };
+    }
+
+    if (
+      !nicepayService.verifyApproveResponseSignature(
+        result.TID || txTid,
+        result.MID || mid,
+        result.Amt ?? amt,
+        result.Signature
+      )
+    ) {
+      await paymentRepository.markFailed(moid, { ...result, error: 'approve_signature_mismatch' });
+      return {
+        redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+          status: 'fail',
+          message: '승인 결과 검증에 실패했습니다.',
+          moid,
+        }),
+      };
+    }
+
+    const { usage } = await billingRepository.charge(order.facility_id, Number(order.amount), {
+      note: '알림톡 충전(NicePay)',
+      paymentMethod: '카드(NicePay)',
+      pgTid: result.TID || txTid,
+      pgMoid: moid,
+      receiptUrl: result.ReceiptURL || undefined,
+    });
+
+    await paymentRepository.markPaid(moid, {
+      tid: result.TID || txTid,
+      payMethod: result.PayMethod || body.PayMethod || 'CARD',
+      authCode: result.AuthCode || null,
+      rawResponse: result,
+      usageHistoryId: usage.id,
+    });
+
+    return {
+      redirectUrl: nicepayService.clientResultUrl(facilityCode, {
+        status: 'success',
+        message: '충전이 완료되었습니다.',
+        moid,
+      }),
+    };
+  },
+
   mapUsageRow(row) {
+    const raw = row.pg_raw_response || {};
+    const pgTid = row.pg_tid || row.po_tid || raw.TID || null;
+    const buyerEmail =
+      raw.BuyerEmail ||
+      process.env.NICEPAY_BUYER_EMAIL ||
+      'test@abc.com';
     return {
       id: row.id,
       facilityId: row.facility_id,
@@ -283,6 +496,89 @@ export const facilityService = {
       receiptUrl: row.receipt_url,
       note: row.note,
       createdAt: row.created_at,
+      cancelledAt: row.cancelled_at || null,
+      cancelledAmount:
+        row.cancelled_amount != null ? Number(row.cancelled_amount) : null,
+      facilityBalance:
+        row.kakao_balance != null ? Number(row.kakao_balance) : null,
+      pgTid,
+      pgMoid: row.pg_moid || raw.Moid || null,
+      buyerEmail: row.type === 'charge' ? buyerEmail : null,
+      authCode: row.pg_auth_code || raw.AuthCode || null,
+      authDate: raw.AuthDate || null,
+      cardName: raw.CardName || raw.AcquCardName || null,
+      cardNo: raw.CardNo || null,
+      goodsName: raw.GoodsName || null,
+      resultMsg: raw.ResultMsg || null,
+    };
+  },
+
+  async cancelCharge(usageId, cancelAmount) {
+    const existing = await billingRepository.findUsageById(usageId);
+    if (!existing || existing.type !== 'charge') {
+      throw createError(404, '충전 내역을 찾을 수 없습니다.');
+    }
+
+    const amount = Number(cancelAmount);
+    const maxByCharge = Number(existing.amount || 0);
+    const partial = amount < maxByCharge;
+
+    const pgTid = existing.pg_tid || existing.po_tid || null;
+    const pgMoid = existing.pg_moid || null;
+
+    // NicePay 결제건은 PG 취소 성공 후에만 DB 반영
+    if (pgTid) {
+      if (!nicepayService.isConfigured()) {
+        throw createError(500, '나이스페이 설정이 없어 PG 결제를 취소할 수 없습니다.');
+      }
+      const pg = await nicepayService.cancelPayment({
+        tid: pgTid,
+        moid: pgMoid,
+        cancelAmt: amount,
+        partial,
+        cancelMsg: '관리자 충전취소',
+      });
+      if (!pg.ok) {
+        throw createError(
+          400,
+          pg.result?.ResultMsg ||
+            `나이스페이 결제 취소에 실패했습니다. (${pg.result?.ResultCode || 'unknown'})`
+        );
+      }
+      if (pgMoid) {
+        await paymentRepository.markCancelled(pgMoid, pg.result);
+      }
+    } else if (String(existing.payment_method || '').includes('NicePay')) {
+      throw createError(400, 'PG 거래번호(TID)가 없어 나이스페이 취소를 진행할 수 없습니다.');
+    }
+
+    // 이미 DB 취소된 건은 PG만 재시도한 뒤 현재 상태 반환
+    if (existing.cancelled_at) {
+      return {
+        item: this.mapUsageRow(existing),
+        balance: Number(existing.kakao_balance),
+        pgCancelled: true,
+        alreadyDbCancelled: true,
+      };
+    }
+
+    const result = await billingRepository.cancelCharge(usageId, cancelAmount);
+    if (result.error === 'NOT_FOUND') throw createError(404, '충전 내역을 찾을 수 없습니다.');
+    if (result.error === 'ALREADY_CANCELLED') {
+      throw createError(400, '이미 취소된 충전 내역입니다.');
+    }
+    if (result.error === 'INVALID_AMOUNT') {
+      throw createError(400, '취소 금액을 올바르게 입력해 주세요.');
+    }
+    if (result.error === 'EXCEEDS_CHARGE') {
+      throw createError(400, '충전금액보다 많은 금액을 취소할 수 없습니다.');
+    }
+    if (result.error === 'EXCEEDS_BALANCE') {
+      throw createError(400, '시설사 잔액보다 많은 금액을 취소할 수 없습니다.');
+    }
+    return {
+      item: this.mapUsageRow(result.usage),
+      balance: result.balance,
     };
   },
 

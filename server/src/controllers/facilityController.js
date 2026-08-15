@@ -130,6 +130,36 @@ export const facilityController = {
     }
   },
 
+  async prepareCharge(req, res, next) {
+    try {
+      res.json(
+        await facilityService.prepareNicepayCharge(
+          req.params.facilityCode,
+          req.body.amount
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async nicepayReturn(req, res) {
+    try {
+      const body = { ...req.body, ...req.query };
+      const result = await facilityService.handleNicepayReturn(body);
+      res.redirect(303, result.redirectUrl);
+    } catch (err) {
+      const facilityCode = req.body?.ReqReserved || req.query?.ReqReserved || 'demo-park';
+      const { nicepayService } = await import('../services/nicepayService.js');
+      const url = nicepayService.clientResultUrl(facilityCode, {
+        status: 'fail',
+        message: err.message || '결제 처리 중 오류가 발생했습니다.',
+        moid: req.body?.Moid || req.query?.Moid,
+      });
+      res.redirect(303, url);
+    }
+  },
+
   async listSends(req, res, next) {
     try {
       res.json(
@@ -198,6 +228,16 @@ export const facilityController = {
             pageSize: Number(req.query.pageSize || 50),
           }
         )
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async cancelCharge(req, res, next) {
+    try {
+      res.json(
+        await facilityService.cancelCharge(req.params.id, req.body?.amount)
       );
     } catch (err) {
       next(err);

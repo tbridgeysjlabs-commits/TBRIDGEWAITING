@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS facilities (
 CREATE TABLE IF NOT EXISTS facility_settings (
   facility_id UUID PRIMARY KEY REFERENCES facilities(id) ON DELETE CASCADE,
   profile_image_url TEXT,
+  -- 통합 약관 본문 (기존 privacy/marketing 컬럼은 호환용으로 유지, 신규 저장은 terms_of_use* 만 사용)
   terms_of_use TEXT NOT NULL DEFAULT '',
   privacy_policy TEXT NOT NULL DEFAULT '',
   marketing_policy TEXT NOT NULL DEFAULT '',
@@ -44,6 +45,10 @@ CREATE TABLE IF NOT EXISTS facility_settings (
   signage_template_key VARCHAR(50) NOT NULL DEFAULT 'basic',
   postpone_policy VARCHAR(30) NOT NULL DEFAULT 'none',
   postpone_limit INT NOT NULL DEFAULT 3,
+  brand_display_mode VARCHAR(30) NOT NULL DEFAULT 'image_text',
+  theme VARCHAR(20) NOT NULL DEFAULT 'light',
+  entry_wait_minutes INT NOT NULL DEFAULT 5,
+  waiting_notification_order INT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -72,6 +77,7 @@ CREATE TABLE IF NOT EXISTS waitings (
   status VARCHAR(20) NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'completed', 'cancelled', 'no_show', 'admin_cancelled')),
   marketing_agreed BOOLEAN NOT NULL DEFAULT FALSE,
+  terms_agreed BOOLEAN NOT NULL DEFAULT FALSE,
   registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
@@ -81,6 +87,9 @@ CREATE TABLE IF NOT EXISTS waitings (
   postpone_count INT NOT NULL DEFAULT 0,
   queue_order INT,
   kakao_sent_at TIMESTAMPTZ,
+  called_at TIMESTAMPTZ,
+  call_deadline_at TIMESTAMPTZ,
+  notified_imminent_entry BOOLEAN NOT NULL DEFAULT FALSE,
   entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -114,8 +123,30 @@ CREATE TABLE IF NOT EXISTS usage_history (
   amount NUMERIC(12,2) NOT NULL DEFAULT 0,
   unit_cost NUMERIC(12,2),
   balance_after NUMERIC(12,2),
+  payment_method VARCHAR(100),
+  receipt_url TEXT,
+  cancelled_at TIMESTAMPTZ,
+  cancelled_amount NUMERIC(12,2),
+  pg_tid VARCHAR(40),
+  pg_moid VARCHAR(64),
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS payment_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+  moid VARCHAR(64) NOT NULL UNIQUE,
+  amount NUMERIC(12,2) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'failed', 'cancelled')),
+  tid VARCHAR(40),
+  pay_method VARCHAR(30),
+  auth_code VARCHAR(40),
+  raw_response JSONB,
+  usage_history_id UUID REFERENCES usage_history(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_history_facility_date

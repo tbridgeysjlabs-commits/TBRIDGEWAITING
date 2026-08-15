@@ -41,6 +41,14 @@ export const waitingController = {
     }
   },
 
+  async call(req, res, next) {
+    try {
+      res.json(await waitingService.call(req.params.facilityCode, req.params.waitingId));
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async cancel(req, res, next) {
     try {
       res.json(

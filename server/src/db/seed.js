@@ -155,18 +155,13 @@ async function seed() {
   const facilityId = facilityResult.rows[0].id;
 
   await query(
-    `INSERT INTO facility_settings (
-       facility_id, terms_of_use, privacy_policy, marketing_policy
-     ) VALUES ($1, $2, $3, $4)
+    `INSERT INTO facility_settings (facility_id, terms_of_use)
+     VALUES ($1, $2)
      ON CONFLICT (facility_id) DO UPDATE SET
-       terms_of_use = EXCLUDED.terms_of_use,
-       privacy_policy = EXCLUDED.privacy_policy,
-       marketing_policy = EXCLUDED.marketing_policy`,
+       terms_of_use = EXCLUDED.terms_of_use`,
     [
       facilityId,
-      '1. 이용 약관의 목적은 이렇습니다.\n2. 이용 약관의 목적은 저렇습니다.',
-      '1. 개인정보 수집 및 이용 동의의 목적은 이렇습니다.\n2. 개인정보 수집 및 이용 동의의 목적은 저렇습니다.',
-      '1. 마케팅 관련 개인정보 수집 이용 동의의 목적은 이렇습니다.\n2. 마케팅 관련 개인정보 수집 이용 동의의 목적은 저렇습니다.',
+      '티브리지 웨이팅 서비스 약관\n\n1. 웨이팅 등록 시 부여된 순번에 따라 입장 안내가 진행됩니다.\n2. 호출 이후 미입장 시 매장 정책에 따라 순번이 조정될 수 있습니다.\n3. 개인정보는 웨이팅 안내 목적으로만 이용되며, 목적 달성 후 파기됩니다.',
     ]
   );
 
