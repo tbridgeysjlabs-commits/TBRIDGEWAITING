@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -12,6 +12,27 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
+  const logoutFacility = () => {
+    localStorage.removeItem('tb_facility_token');
+    localStorage.removeItem('tb_facility_user');
+    setFacilityUser(null);
+  };
+
+  const logoutSystem = () => {
+    localStorage.removeItem('tb_system_token');
+    localStorage.removeItem('tb_system_user');
+    setSystemUser(null);
+  };
+
+  useEffect(() => {
+    const onExpired = (e) => {
+      if (e.detail?.scope === 'system') logoutSystem();
+      else logoutFacility();
+    };
+    window.addEventListener('tb:auth-expired', onExpired);
+    return () => window.removeEventListener('tb:auth-expired', onExpired);
+  }, []);
+
   const value = useMemo(
     () => ({
       facilityUser,
@@ -21,21 +42,13 @@ export function AuthProvider({ children }) {
         localStorage.setItem('tb_facility_user', JSON.stringify(user));
         setFacilityUser(user);
       },
-      logoutFacility() {
-        localStorage.removeItem('tb_facility_token');
-        localStorage.removeItem('tb_facility_user');
-        setFacilityUser(null);
-      },
+      logoutFacility,
       loginSystem(token, user) {
         localStorage.setItem('tb_system_token', token);
         localStorage.setItem('tb_system_user', JSON.stringify(user));
         setSystemUser(user);
       },
-      logoutSystem() {
-        localStorage.removeItem('tb_system_token');
-        localStorage.removeItem('tb_system_user');
-        setSystemUser(null);
-      },
+      logoutSystem,
     }),
     [facilityUser, systemUser]
   );

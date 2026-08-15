@@ -8,6 +8,7 @@ import CompleteFacilityInfo from '../../components/customer/complete/CompleteFac
 import CompleteWaitingStatus from '../../components/customer/complete/CompleteWaitingStatus';
 import CompleteActionButtons from '../../components/customer/complete/CompleteActionButtons';
 import CompleteAdArea from '../../components/customer/complete/CompleteAdArea';
+import { themeStyle } from '../../theme/customerTheme';
 
 function formatRegisteredAt(iso) {
   if (!iso) return '';
@@ -48,7 +49,6 @@ export default function CompletePage() {
   };
 
   const cancelWaiting = async () => {
-    if (!window.confirm('대기 등록을 취소할까요?')) return;
     setLoading(true);
     try {
       await api(`/facilities/${facilityCode}/waitings/${waitingId}/cancel`, {
@@ -97,7 +97,7 @@ export default function CompletePage() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen min-w-[768px] items-center justify-center bg-[#f7f5ff] text-gray-400">
+      <div className="flex min-h-dvh w-full max-w-[100vw] items-center justify-center overflow-x-hidden bg-[#f7f5ff] px-4 text-gray-400">
         {toast || 'Loading...'}
       </div>
     );
@@ -106,11 +106,19 @@ export default function CompletePage() {
   const { facility, waiting } = data;
   const isPending = waiting.status === 'pending';
   const showPostpone = facility.postponePolicy !== 'none' && isPending;
+  const theme = facility.theme === 'dark' ? 'dark' : 'light';
+  const style = themeStyle(theme);
 
   return (
-    <div className="min-h-screen min-w-[768px] bg-gradient-to-br from-[#f3f0ff] via-[#faf9ff] to-white font-['Pretendard','Noto_Sans_KR',sans-serif]">
+    <div
+      className="min-h-dvh w-full max-w-[100vw] overflow-x-hidden font-['Pretendard','Noto_Sans_KR',sans-serif]"
+      style={{
+        ...style,
+        background: `linear-gradient(to bottom right, var(--cw-bg), var(--cw-bg-mid), var(--cw-bg-end))`,
+      }}
+    >
       <Toast message={toast} visible={!!toast} />
-      <div className="mx-auto flex min-h-screen w-full max-w-[560px] flex-col px-6 py-5 md:max-w-[640px] md:px-8 md:py-8">
+      <div className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col px-4 py-4 box-border sm:px-6 sm:py-5 md:max-w-[640px] md:px-8 md:py-8">
         <CompleteCloseHeader
           onClose={() => {
             if (window.history.length > 1) navigate(-1);
@@ -121,6 +129,7 @@ export default function CompletePage() {
         <CompleteFacilityInfo
           name={facility.name}
           imageUrl={facility.profileImageUrl}
+          brandDisplayMode={facility.brandDisplayMode}
           registeredLabel={formatRegisteredAt(waiting.registeredAt)}
         />
 

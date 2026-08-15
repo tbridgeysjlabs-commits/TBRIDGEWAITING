@@ -1,9 +1,9 @@
 export default function AgreementCard({ title, required, checked, onChange, body }) {
   return (
-    <section className="rounded-[36px] bg-white p-[30px] shadow-[0_8px_30px_rgba(120,100,180,0.08)] xl:p-[36px]">
+    <section className="rounded-[36px] bg-[var(--cw-ghost-bg,#ffffff)] p-[30px] shadow-[0_8px_30px_rgba(120,100,180,0.08)] xl:p-[36px]">
       <div className="mb-[18px] flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="text-[24px] font-extrabold text-[#1f1a33] xl:text-[27px]">
+          <h2 className="text-[24px] font-extrabold text-[var(--cw-text,#1f1a33)] xl:text-[27px]">
             {title}
           </h2>
           <span
@@ -17,7 +17,9 @@ export default function AgreementCard({ title, required, checked, onChange, body
           </span>
         </div>
         <label className="flex shrink-0 cursor-pointer items-center gap-3">
-          <span className="text-[18px] font-semibold text-gray-600">동의</span>
+          <span className="text-[18px] font-semibold text-[var(--cw-text-soft,#6b7280)]">
+            동의
+          </span>
           <span
             className={`relative flex h-9 w-9 items-center justify-center rounded-lg border-2 transition ${
               checked

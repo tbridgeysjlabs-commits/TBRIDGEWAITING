@@ -3,27 +3,39 @@ import { useWaitingFlow } from '../../context/WaitingFlowContext';
 import NumericKeypad from '../../components/customer/NumericKeypad';
 import { PrimaryButton } from '../../components/customer/ActionButtons';
 
-const PREFIX = '010';
+const DEFAULT_PANEL =
+  'flex h-full w-full max-w-[min(690px,100%)] flex-col justify-between px-[clamp(1rem,2.8vw,2.75rem)] py-[clamp(0.75rem,2.2vh,2.25rem)]';
 
-/** 빈값 허용. 010 접두사도 백스페이스로 전부 삭제 가능 */
+/** 접두사 3자리 제외 나머지 7자리 → 3-3-4 / 8자리 → 3-4-4 */
 function displayPhone(digits) {
   const raw = (digits || '').replace(/\D/g, '').slice(0, 11);
   if (!raw) return '';
-  if (raw.startsWith(PREFIX)) {
-    const rest = raw.slice(PREFIX.length);
-    if (!rest) return '010 - ';
-    if (rest.length <= 4) return `010 - ${rest}`;
-    return `010 - ${rest.slice(0, 4)} - ${rest.slice(4, 8)}`;
-  }
   if (raw.length <= 3) return raw;
-  if (raw.length <= 7) return `${raw.slice(0, 3)} - ${raw.slice(3)}`;
-  return `${raw.slice(0, 3)} - ${raw.slice(3, 7)} - ${raw.slice(7)}`;
+
+  const prefix = raw.slice(0, 3);
+  const rest = raw.slice(3);
+
+  if (rest.length === 8) {
+    return `${prefix}-${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+  if (rest.length === 7) {
+    return `${prefix}-${rest.slice(0, 3)}-${rest.slice(3)}`;
+  }
+
+  // 입력 중: 010 계열은 4-4, 그 외는 3-4 쪽으로 점진 표시
+  if (prefix === '010') {
+    if (rest.length <= 4) return `${prefix}-${rest}`;
+    return `${prefix}-${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+
+  if (rest.length <= 3) return `${prefix}-${rest}`;
+  return `${prefix}-${rest.slice(0, 3)}-${rest.slice(3)}`;
 }
 
 export default function HomePage() {
   const { facilityCode } = useParams();
   const navigate = useNavigate();
-  const { t } = useOutletContext();
+  const { t, homePanelClass } = useOutletContext();
   const { phone, setPhone } = useWaitingFlow();
 
   const digits = phone.replace(/\D/g, '').slice(0, 11);
@@ -43,18 +55,24 @@ export default function HomePage() {
   };
 
   return (
-    <div className="w-full max-w-[690px] rounded-[54px] bg-white p-[42px] shadow-[0_36px_90px_rgba(120,100,180,0.12)] xl:p-[60px]">
-      <div className="mb-3 min-h-[1.2em] text-center text-[51px] font-extrabold tracking-wide text-[#3a3550] xl:text-[60px]">
-        {displayPhone(digits) || '\u00A0'}
+    <div
+      className={`${homePanelClass || DEFAULT_PANEL} rounded-[clamp(1.5rem,3vh,3.375rem)] border border-[var(--cw-panel-border,#e9e5f5)] bg-[var(--cw-panel,#ffffff)] shadow-[0_24px_60px_rgba(120,100,180,0.12)]`}
+    >
+      <div className="w-full shrink-0 py-[clamp(0.35rem,1.1vh,0.95rem)]">
+        <div className="w-full text-center text-[clamp(1.65rem,4.6vh,3.55rem)] font-extrabold leading-tight tracking-wide text-[var(--cw-text,#3a3550)]">
+          {displayPhone(digits) || '\u00A0'}
+        </div>
+        <p className="mt-[clamp(0.3rem,1vh,0.9rem)] w-full text-center text-[clamp(0.8rem,1.95vh,1.35rem)] text-[var(--cw-text-muted,#9ca3af)]">
+          {t('phone_hint')}
+        </p>
       </div>
-      <p className="mb-12 text-center text-[21px] text-gray-400 xl:text-[22px]">
-        {t('phone_hint')}
-      </p>
 
-      <NumericKeypad onKey={onKey} />
+      <div className="flex min-h-0 w-full max-h-[65%] flex-1 items-stretch py-[clamp(0.25rem,0.85vh,0.7rem)]">
+        <NumericKeypad onKey={onKey} />
+      </div>
 
       <PrimaryButton
-        className="mt-12 w-full py-6 text-[22px]"
+        className="w-full shrink-0 rounded-2xl bg-[var(--cw-button-bg,#5B21B6)] py-[clamp(0.65rem,1.8vh,1.25rem)] text-[clamp(0.9rem,2vh,1.25rem)] text-[var(--cw-button-fg,#fff)] shadow-[0_8px_20px_rgba(91,33,182,0.35)]"
         disabled={!valid}
         onClick={() => navigate(`/w/${facilityCode}/party`)}
       >

@@ -5,6 +5,8 @@ import AdminSidebar from '../../components/admin/AdminSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import { launchNicepay } from '../../lib/nicepay';
+import PaymentReceiptModal from '../../components/billing/PaymentReceiptModal';
 
 const PAGE_SIZES = [10, 30, 50, 100, 200];
 const PRESETS = [10000, 50000, 100000, 1000000];
@@ -31,6 +33,7 @@ export default function BillingPage() {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [toast, setToast] = useState('');
+  const [receiptItem, setReceiptItem] = useState(null);
 
   const loadBilling = async () => {
     const b = await api(`/admin/${facilityCode}/billing`);
@@ -98,23 +101,45 @@ export default function BillingPage() {
 
   const charge = async (e) => {
     e.preventDefault();
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 1000) {
+      setToast('충전 금액은 1,000원 이상이어야 합니다.');
+      return;
+    }
     try {
-      const result = await api(`/admin/${facilityCode}/billing/charge`, {
+      const prepared = await api(`/admin/${facilityCode}/billing/charge/prepare`, {
         method: 'POST',
-        body: JSON.stringify({
-          amount: Number(amount),
-          paymentMethod: '카드(MOCK)',
-        }),
+        body: JSON.stringify({ amount: value }),
       });
-      setBilling(result);
       setOpen(false);
-      setAmount('');
-      setToast('충전이 완료되었습니다.');
-      setTimeout(() => setToast(''), 2500);
-      if (tab === 'charges') await loadCharges();
-      else await loadBilling();
+      setToast('결제창을 호출합니다...');
+      await launchNicepay(prepared.pay);
     } catch (err) {
+      // prepare 실패 시(키 미설정 등) MOCK 직접충전 폴백 시도
+      if (/나이스페이 설정/.test(err.message || '')) {
+        try {
+          const result = await api(`/admin/${facilityCode}/billing/charge`, {
+            method: 'POST',
+            body: JSON.stringify({
+              amount: value,
+              paymentMethod: '카드(MOCK)',
+            }),
+          });
+          setBilling(result);
+          setOpen(false);
+          setAmount('');
+          setToast('충전이 완료되었습니다. (MOCK)');
+          setTimeout(() => setToast(''), 2500);
+          if (tab === 'charges') await loadCharges();
+          else await loadBilling();
+          return;
+        } catch (mockErr) {
+          setToast(mockErr.message);
+          return;
+        }
+      }
       setToast(err.message);
+      setTimeout(() => setToast(''), 3000);
     }
   };
 
@@ -282,15 +307,14 @@ export default function BillingPage() {
                       <td>{item.paymentMethod || '-'}</td>
                       <td>{Number(item.amount).toLocaleString()}원</td>
                       <td>
-                        {item.receiptUrl ? (
-                          <a
+                        {item.pgTid || item.receiptUrl ? (
+                          <button
+                            type="button"
                             className="btn-primary mini"
-                            href={item.receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                            onClick={() => setReceiptItem(item)}
                           >
                             결제확인증
-                          </a>
+                          </button>
                         ) : (
                           '-'
                         )}
@@ -377,6 +401,10 @@ export default function BillingPage() {
               </div>
             </form>
           </div>
+        )}
+
+        {receiptItem && (
+          <PaymentReceiptModal item={receiptItem} onClose={() => setReceiptItem(null)} />
         )}
       </main>
     </div>

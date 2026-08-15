@@ -77,10 +77,26 @@ export default function SettingsPage() {
           enabledLanguages: enabledLangs.includes('ko')
             ? enabledLangs
             : ['ko', ...enabledLangs],
-          termsOfUse: form.termsOfUseKo,
-          privacyPolicy: form.privacyPolicyKo,
-          marketingPolicy: form.marketingPolicyKo,
+          terms: form.termsKo,
+          termsOfUse: form.termsKo,
+          termsEn: form.termsEn,
+          termsJa: form.termsJa,
+          termsZh: form.termsZh,
           kakaoWarningThreshold: Number(form.kakaoWarningThreshold) || 0,
+          entryWaitMinutes: Math.max(1, Number(form.entryWaitMinutes) || 5),
+          waitingNotificationOrder:
+            form.waitingNotificationOrder === '' ||
+            form.waitingNotificationOrder == null
+              ? null
+              : (() => {
+                  const n = Number(form.waitingNotificationOrder);
+                  if (!Number.isInteger(n) || n < 1) {
+                    throw new Error('입장 대기 알림 순번은 1 이상 정수여야 합니다.');
+                  }
+                  return n;
+                })(),
+          brandDisplayMode: form.brandDisplayMode,
+          theme: form.theme,
         }),
       });
 
@@ -138,6 +154,15 @@ export default function SettingsPage() {
         name: updated.name,
         adminContact: updated.adminContact || form.adminContact,
         profileImageUrl: updated.profileImageUrl || '',
+        kakaoWarningThreshold:
+          updated.kakaoWarningThreshold ?? form.kakaoWarningThreshold,
+        entryWaitMinutes: updated.entryWaitMinutes ?? form.entryWaitMinutes,
+        waitingNotificationOrder:
+          updated.waitingNotificationOrder == null
+            ? ''
+            : updated.waitingNotificationOrder,
+        brandDisplayMode: updated.brandDisplayMode || form.brandDisplayMode,
+        theme: updated.theme || form.theme,
         links: updated.links,
       };
       const langs = Array.isArray(updated.enabledLanguages)
@@ -157,7 +182,6 @@ export default function SettingsPage() {
 
   saveRef.current = save;
 
-  // BrowserRouter에서는 useBlocker 사용 불가 → 링크 클릭 이탈 가드
   useEffect(() => {
     const onClick = (e) => {
       if (!dirtyRef.current) return;
@@ -189,20 +213,20 @@ export default function SettingsPage() {
       adminContact: settings.adminContact || '',
       profileImageUrl: settings.profileImageUrl || '',
       kakaoWarningThreshold: settings.kakaoWarningThreshold ?? 1000,
+      entryWaitMinutes: settings.entryWaitMinutes ?? 5,
+      waitingNotificationOrder:
+        settings.waitingNotificationOrder == null
+          ? ''
+          : settings.waitingNotificationOrder,
       postponePolicy: settings.postponePolicy || 'none',
       postponeLimit: settings.postponeLimit || 3,
-      termsOfUseKo: settings.termsOfUseKo || settings.termsOfUse || '',
-      termsOfUseEn: settings.termsOfUseEn || '',
-      termsOfUseJa: settings.termsOfUseJa || '',
-      termsOfUseZh: settings.termsOfUseZh || '',
-      privacyPolicyKo: settings.privacyPolicyKo || settings.privacyPolicy || '',
-      privacyPolicyEn: settings.privacyPolicyEn || '',
-      privacyPolicyJa: settings.privacyPolicyJa || '',
-      privacyPolicyZh: settings.privacyPolicyZh || '',
-      marketingPolicyKo: settings.marketingPolicyKo || settings.marketingPolicy || '',
-      marketingPolicyEn: settings.marketingPolicyEn || '',
-      marketingPolicyJa: settings.marketingPolicyJa || '',
-      marketingPolicyZh: settings.marketingPolicyZh || '',
+      brandDisplayMode:
+        settings.brandDisplayMode === 'image' ? 'image' : 'image_text',
+      theme: settings.theme === 'dark' ? 'dark' : 'light',
+      termsKo: settings.termsKo || settings.termsOfUseKo || settings.terms || settings.termsOfUse || '',
+      termsEn: settings.termsEn || settings.termsOfUseEn || '',
+      termsJa: settings.termsJa || settings.termsOfUseJa || '',
+      termsZh: settings.termsZh || settings.termsOfUseZh || '',
       links: settings.links,
     };
     const langs = Array.isArray(settings.enabledLanguages)
@@ -288,6 +312,9 @@ export default function SettingsPage() {
 
   if (!form) return <div className="center-page">Loading...</div>;
 
+  const isWideBrand = form.brandDisplayMode === 'image';
+  const imageRatioLabel = isWideBrand ? '2.3 : 1' : '1:1';
+
   return (
     <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
@@ -313,21 +340,81 @@ export default function SettingsPage() {
             />
           </label>
 
+          <div className="settings-radio-row">
+            <span className="settings-radio-label">테마 선택</span>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="theme"
+                checked={form.theme === 'light'}
+                onChange={() => setForm({ ...form, theme: 'light' })}
+              />
+              라이트 테마
+            </label>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="theme"
+                checked={form.theme === 'dark'}
+                onChange={() => setForm({ ...form, theme: 'dark' })}
+              />
+              다크 테마
+            </label>
+          </div>
+
+          <div className="settings-radio-row">
+            <span className="settings-radio-label">시설사 표시 영역</span>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="brandDisplayMode"
+                checked={form.brandDisplayMode === 'image_text'}
+                onChange={() =>
+                  setForm({ ...form, brandDisplayMode: 'image_text' })
+                }
+              />
+              작은 이미지 + 텍스트
+            </label>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="brandDisplayMode"
+                checked={form.brandDisplayMode === 'image'}
+                onChange={() => setForm({ ...form, brandDisplayMode: 'image' })}
+              />
+              이미지 단독
+            </label>
+          </div>
+
           <div className="settings-image-row">
-            <span>시설사 이미지</span>
+            <span>시설사 이미지 ({imageRatioLabel})</span>
             <label className="btn-search file-btn">
               이미지 찾기
               <input type="file" accept="image/*" hidden onChange={uploadImage} />
             </label>
             {form.profileImageUrl ? (
-              <div className="settings-image-preview">
+              <div
+                className={`settings-image-preview ${isWideBrand ? 'wide' : ''}`}
+              >
                 <img src={form.profileImageUrl} alt="시설사" />
                 <button type="button" className="img-remove" onClick={clearImage}>
                   X
                 </button>
               </div>
             ) : (
-              <div className="settings-image-placeholder">IMG</div>
+              <div
+                className={`settings-image-placeholder ${isWideBrand ? 'wide' : ''}`}
+              >
+                IMG
+              </div>
+            )}
+            {!isWideBrand && (
+              <input
+                className="settings-brand-text"
+                placeholder="텍스트 입력"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             )}
           </div>
 
@@ -340,38 +427,68 @@ export default function SettingsPage() {
             />
           </label>
 
-          <label>
-            충전 필요 알림 금액 설정
-            <div className="inline-unit">
-              <input
-                type="number"
-                min="0"
-                value={form.kakaoWarningThreshold}
-                onChange={(e) =>
-                  setForm({ ...form, kakaoWarningThreshold: e.target.value })
-                }
-              />
-              <span>원</span>
-            </div>
-          </label>
+          <div className="settings-dual-row settings-triple-row">
+            <label>
+              충전 필요 알림 금액
+              <div className="inline-unit">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="금액 입력"
+                  value={form.kakaoWarningThreshold}
+                  onChange={(e) =>
+                    setForm({ ...form, kakaoWarningThreshold: e.target.value })
+                  }
+                />
+                <span>원</span>
+              </div>
+            </label>
+            <label>
+              입장 대기 알림 순번 설정
+              <div className="inline-unit">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={form.waitingNotificationOrder}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      setForm({ ...form, waitingNotificationOrder: '' });
+                      return;
+                    }
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return;
+                    setForm({
+                      ...form,
+                      waitingNotificationOrder: Math.max(1, Math.floor(n)),
+                    });
+                  }}
+                />
+                <span>번</span>
+              </div>
+            </label>
+            <label>
+              입장 대기 시간 설정
+              <div className="inline-unit">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="분 입력"
+                  value={form.entryWaitMinutes}
+                  onChange={(e) =>
+                    setForm({ ...form, entryWaitMinutes: e.target.value })
+                  }
+                />
+                <span>분</span>
+              </div>
+            </label>
+          </div>
         </section>
 
         <section className="settings-section">
-          <h2>다국어 선택</h2>
-          <div className="postpone-policy-group">
-            {TOGGLE_LANGS.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                className={`chip round ${enabledLangs.includes(lang.code) ? 'active' : ''}`}
-                onClick={() => toggleLang(lang.code)}
-              >
-                {lang.label}
-              </button>
-            ))}
-          </div>
-
-          <h2 style={{ marginTop: 20 }}>미루기 처리 방법 설정</h2>
+          <h2>미루기 처리 방법</h2>
           <div className="postpone-policy-group">
             {[
               { key: 'none', label: '미루기 없음' },
@@ -423,6 +540,20 @@ export default function SettingsPage() {
               </button>
             </div>
           )}
+
+          <h2 style={{ marginTop: 20 }}>다국어 선택</h2>
+          <div className="postpone-policy-group">
+            {TOGGLE_LANGS.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                className={`chip round ${enabledLangs.includes(lang.code) ? 'active' : ''}`}
+                onClick={() => toggleLang(lang.code)}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="settings-section">
@@ -476,28 +607,22 @@ export default function SettingsPage() {
 
         <section className="settings-section">
           <h2>약관</h2>
-          {[
-            ['termsOfUse', '이용약관'],
-            ['privacyPolicy', '개인정보 수집 및 이용약관'],
-            ['marketingPolicy', '마케팅 관련 개인정보 수집 및 이용약관'],
-          ].map(([base, title]) => (
-            <div key={base} className="term-lang-block">
-              <h3>{title}</h3>
-              {activeLangFields.map((lang) => (
-                <label key={lang.key}>
-                  {title} ({lang.label})
-                  <textarea
-                    rows={4}
-                    placeholder={`${title} 입력`}
-                    value={form[`${base}${lang.key}`]}
-                    onChange={(e) =>
-                      setForm({ ...form, [`${base}${lang.key}`]: e.target.value })
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-          ))}
+          <div className="term-lang-block">
+            <h3>약관 작성</h3>
+            {activeLangFields.map((lang) => (
+              <label key={lang.key}>
+                약관 ({lang.label})
+                <textarea
+                  rows={10}
+                  placeholder="약관 본문을 입력해 주세요"
+                  value={form[`terms${lang.key}`] || ''}
+                  onChange={(e) =>
+                    setForm({ ...form, [`terms${lang.key}`]: e.target.value })
+                  }
+                />
+              </label>
+            ))}
+          </div>
         </section>
 
         <button

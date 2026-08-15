@@ -43,8 +43,9 @@ export default function HistoryPage() {
   const [preset, setPreset] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [completed, setCompleted] = useState(true);
-  const [cancelled, setCancelled] = useState(true);
+  const [pending, setPending] = useState(true);
+  const [completed, setCompleted] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
   const [phone, setPhone] = useState('');
   const [totalCount, setTotalCount] = useState('');
   const [dailySeq, setDailySeq] = useState('');
@@ -56,10 +57,11 @@ export default function HistoryPage() {
 
   const statuses = useMemo(() => {
     const list = [];
+    if (pending) list.push('pending');
     if (completed) list.push('completed');
     if (cancelled) list.push('cancelled');
     return list;
-  }, [completed, cancelled]);
+  }, [pending, completed, cancelled]);
 
   const queryString = () => {
     const params = new URLSearchParams();
@@ -106,8 +108,9 @@ export default function HistoryPage() {
     setPreset('all');
     setStartDate('');
     setEndDate('');
-    setCompleted(true);
-    setCancelled(true);
+    setPending(true);
+    setCompleted(false);
+    setCancelled(false);
     setPhone('');
     setTotalCount('');
     setDailySeq('');
@@ -174,6 +177,14 @@ export default function HistoryPage() {
           </div>
           <div className="filter-row">
             <span className="filter-label">상태</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={pending}
+                onChange={(e) => setPending(e.target.checked)}
+              />
+              대기 중
+            </label>
             <label>
               <input
                 type="checkbox"

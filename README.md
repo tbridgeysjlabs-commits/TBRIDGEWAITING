@@ -43,7 +43,12 @@ client/   React (Vite) 프론트엔드
 server/   Express API (Controller → Service → Repository)
 ```
 
-카카오 알림톡은 티브리지 공용 발신프로필/템플릿(시설사 변수 주입) + mock 발송이며, 발송 시 선불 잔액이 차감되고 `usage_history`에 집계됩니다.
+카카오 알림톡은 **[뿌리오 ppurio.com](https://www.ppurio.com/) 연동 API**로 발송합니다.
+
+- 엔드포인트: `https://message.ppurio.com/v1/token`, `/v1/kakao` (비즈뿌리오 `api.bizppurio.com` 미사용). 도메인이 다르면만 `PPURIO_API_BASE_URL`로 덮어쓰기
+- `PPURIO_ACCOUNT` / `PPURIO_AUTH_KEY` / `PPURIO_SENDER_PROFILE` 가 있으면 실발송, 없으면 MOCK
+- 템플릿 코드·변수 매핑은 `server/.env.example`, `server/src/services/ppurioTemplates.js` 참고
+- **배포 체크:** Render Environment에 위 3키 등록, 연동 IP에 Render 출구 IP 등록, 발신프로필/템플릿이 뿌리오 계정에 승인돼 있는지 확인
 
 ### 추가 기능
 - 웨이팅 완료 페이지: `/w/{facility_code}/complete/{waiting_id}`

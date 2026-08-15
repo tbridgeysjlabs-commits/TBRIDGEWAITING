@@ -5,6 +5,7 @@ import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import PaymentReceiptModal from '../../components/billing/PaymentReceiptModal';
 
 const PAGE_SIZES = [10, 30, 50, 100, 200];
 
@@ -12,6 +13,19 @@ function formatPhone(phone) {
   const p = String(phone || '').replace(/\D/g, '');
   if (p.length === 11) return `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}`;
   return phone || '-';
+}
+
+/** 취소완료(YY.MM.DD hh:mm:ss) */
+function formatCancelDone(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `취소완료(${yy}.${mm}.${dd} ${hh}:${mi}:${ss})`;
 }
 
 export default function SystemBillingPage() {
@@ -27,6 +41,10 @@ export default function SystemBillingPage() {
   const [sends, setSends] = useState({ items: [], total: 0, sendCount: 0, totalCost: 0 });
   const [charges, setCharges] = useState({ items: [], total: 0 });
   const [toast, setToast] = useState('');
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelAmount, setCancelAmount] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [receiptItem, setReceiptItem] = useState(null);
 
   const loadSends = async () => {
     const params = new URLSearchParams({
@@ -62,6 +80,39 @@ export default function SystemBillingPage() {
     setPage(1);
     const run = tab === 'summary' ? loadSends : loadCharges;
     run().catch((e) => setToast(e.message));
+  };
+
+  const openCancel = (item) => {
+    const chargeAmt = Number(item.amount || 0);
+    const balance =
+      item.facilityBalance != null ? Number(item.facilityBalance) : chargeAmt;
+    const defaultAmt = Math.max(0, Math.min(chargeAmt, balance));
+    setCancelTarget(item);
+    setCancelAmount(String(defaultAmt));
+  };
+
+  const submitCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await api(
+        `/system-admin/billing/charges/${cancelTarget.id}/cancel`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ amount: Number(cancelAmount) }),
+        },
+        'system'
+      );
+      setCancelTarget(null);
+      setToast('결제가 취소되었습니다.');
+      setTimeout(() => setToast(''), 2500);
+      await loadCharges();
+    } catch (e) {
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const total = tab === 'summary' ? sends.total : charges.total;
@@ -210,7 +261,9 @@ export default function SystemBillingPage() {
                     <th>충전일시</th>
                     <th>충전수단</th>
                     <th>충전금액</th>
+                    <th>잔액</th>
                     <th>결제확인증</th>
+                    <th>취소</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -221,24 +274,43 @@ export default function SystemBillingPage() {
                       <td>{item.paymentMethod || '-'}</td>
                       <td>{Number(item.amount).toLocaleString()}원</td>
                       <td>
-                        {item.receiptUrl ? (
-                          <a
+                        {item.balanceAfter != null
+                          ? `${Number(item.balanceAfter).toLocaleString()}원`
+                          : '-'}
+                      </td>
+                      <td>
+                        {item.pgTid || item.receiptUrl ? (
+                          <button
+                            type="button"
                             className="btn-primary mini"
-                            href={item.receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                            onClick={() => setReceiptItem(item)}
                           >
                             결제확인증
-                          </a>
+                          </button>
                         ) : (
                           '-'
+                        )}
+                      </td>
+                      <td>
+                        {item.cancelledAt ? (
+                          <span className="cancel-done-text">
+                            {formatCancelDone(item.cancelledAt)}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-ghost mini"
+                            onClick={() => openCancel(item)}
+                          >
+                            취소하기
+                          </button>
                         )}
                       </td>
                     </tr>
                   ))}
                   {!charges.items.length && (
                     <tr>
-                      <td colSpan={5}>충전 내역이 없습니다.</td>
+                      <td colSpan={7}>충전 내역이 없습니다.</td>
                     </tr>
                   )}
                 </tbody>
@@ -275,6 +347,59 @@ export default function SystemBillingPage() {
           </div>
         </div>
       </main>
+
+      {cancelTarget && (
+        <div className="modal-backdrop" onClick={() => !cancelling && setCancelTarget(null)}>
+          <div className="modal charge-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>결제 취소</h2>
+            <p style={{ marginBottom: 12, color: '#555' }}>
+              {cancelTarget.facilityName} · 충전금액{' '}
+              {Number(cancelTarget.amount).toLocaleString()}원
+              {cancelTarget.facilityBalance != null && (
+                <>
+                  {' '}
+                  · 현재 잔액 {Number(cancelTarget.facilityBalance).toLocaleString()}원
+                </>
+              )}
+            </p>
+            <label>
+              취소 금액
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={cancelAmount}
+                onChange={(e) => setCancelAmount(e.target.value)}
+              />
+            </label>
+            <p style={{ marginTop: 8, fontSize: 13, color: '#777' }}>
+              부분 취소가 가능합니다. 취소 금액만큼 시설사 알림톡 잔액에서 차감됩니다.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={cancelling}
+                onClick={() => setCancelTarget(null)}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={cancelling || !(Number(cancelAmount) > 0)}
+                onClick={submitCancel}
+              >
+                {cancelling ? '처리 중...' : '취소 확정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {receiptItem && (
+        <PaymentReceiptModal item={receiptItem} onClose={() => setReceiptItem(null)} />
+      )}
     </div>
   );
 }

@@ -7,6 +7,17 @@ function getToken(scope = 'facility') {
   return localStorage.getItem('tb_facility_token');
 }
 
+function clearAuth(scope = 'facility') {
+  if (scope === 'system') {
+    localStorage.removeItem('tb_system_token');
+    localStorage.removeItem('tb_system_user');
+  } else {
+    localStorage.removeItem('tb_facility_token');
+    localStorage.removeItem('tb_facility_user');
+  }
+  window.dispatchEvent(new CustomEvent('tb:auth-expired', { detail: { scope } }));
+}
+
 export async function api(path, options = {}, scope = 'facility') {
   const headers = {
     ...(options.headers || {}),
@@ -26,6 +37,9 @@ export async function api(path, options = {}, scope = 'facility') {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuth(scope);
+    }
     throw new Error(data.message || '요청에 실패했습니다.');
   }
   return data;

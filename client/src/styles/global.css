@@ -677,7 +677,7 @@ a {
 
 .waiting-row {
   display: grid;
-  grid-template-columns: 48px 90px 110px 150px 120px 1fr;
+  grid-template-columns: 48px 90px 110px 150px 120px minmax(220px, 1fr);
   gap: 10px;
   align-items: center;
   padding: 16px 18px;
@@ -692,6 +692,52 @@ a {
 .waiting-row.selected {
   outline: 2px solid var(--purple);
   outline-offset: -2px;
+}
+
+.waiting-row.calling,
+.waiting-row.calling.selected {
+  outline: 2px solid #ff0000;
+  outline-offset: -2px;
+}
+
+.waiting-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.call-status {
+  min-width: 140px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.call-timer {
+  color: #c62828;
+  white-space: nowrap;
+}
+
+.call-missed {
+  color: #b71c1c;
+  white-space: nowrap;
+}
+
+.mini-call {
+  border: 1px solid #c62828;
+  background: #fff;
+  color: #c62828;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mini-call:hover {
+  background: #ffebee;
 }
 
 .order-circle {
@@ -714,7 +760,6 @@ a {
 }
 
 .mini-cancel {
-  justify-self: end;
   border: 1px solid #999;
   background: #fff;
   border-radius: 8px;
@@ -753,6 +798,18 @@ a {
 
 .filter-row:last-child {
   margin-bottom: 0;
+}
+
+.filter-row > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 4px;
+}
+
+.filter-row > label > input,
+.filter-row > label > select {
+  margin-left: 4px;
 }
 
 .filter-label {
@@ -962,145 +1019,285 @@ th {
 
 /* Signage */
 .signage-page {
+  --signage-accent: #f4a7d0;
+  --signage-panel: rgba(55, 40, 120, 0.55);
+  --signage-card: rgba(28, 20, 70, 0.55);
+  --signage-line: rgba(255, 255, 255, 0.18);
   min-height: 100vh;
-  padding: 28px 32px;
+  min-height: 100dvh;
+  padding: clamp(18px, 2.4vh, 32px) clamp(22px, 2.8vw, 40px);
   display: flex;
   flex-direction: column;
+  gap: clamp(14px, 1.8vh, 22px);
+  /* 기존 배경색 유지 */
   background:
     linear-gradient(135deg, #1d1638 0%, #3a2a7a 45%, #5e42d1 100%);
   color: #fff;
+  box-sizing: border-box;
 }
 
 .signage-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
 }
 
-.signage-header h1 {
-  margin: 0;
-  font-size: 40px;
+.signage-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.signage-header p {
-  margin: 8px 0 0;
-  font-size: 22px;
-  opacity: 0.9;
+.signage-brand-avatar {
+  width: clamp(48px, 4.8vw, 64px);
+  height: clamp(48px, 4.8vw, 64px);
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.signage-brand-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.signage-brand-pill {
+  max-width: min(48vw, 420px);
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.signage-brand-wide {
+  width: min(360px, 42vw);
+  aspect-ratio: 2.3 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}
+
+.signage-brand-wide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .signage-clock {
-  font-size: 32px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.signage-clock-date {
+  font-size: clamp(16px, 1.7vw, 22px);
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.signage-clock-time {
+  font-size: clamp(28px, 3.1vw, 40px);
   font-weight: 800;
-  color: #ffd2d2;
+  letter-spacing: -0.02em;
 }
 
-.signage-page.vertical {
-  gap: 14px;
+.signage-clock-sec {
+  font-size: clamp(13px, 1.2vw, 16px);
+  font-weight: 700;
+  opacity: 0.9;
+  align-self: flex-start;
+  margin-top: 0.35em;
+  min-width: 1.4em;
 }
 
-.signage-band {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  padding: 16px 18px;
+.signage-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(260px, 0.95fr);
+  gap: clamp(14px, 1.6vw, 22px);
 }
 
-.signage-band h2 {
-  margin: 0 0 12px;
-  font-size: 22px;
+.signage-panel {
+  background: var(--signage-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: clamp(16px, 2vh, 26px) clamp(16px, 1.8vw, 26px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
 }
 
-.signage-band.top,
-.signage-band.bottom {
-  flex: 0 0 auto;
+.signage-accent-label {
+  margin: 0;
+  font-size: clamp(15px, 1.4vw, 20px);
+  font-weight: 700;
+  color: var(--signage-accent);
 }
 
-.signage-band.middle {
+.signage-panel-call {
+  min-height: 0;
+}
+
+.signage-call-stage {
   flex: 1;
   display: grid;
   place-items: center;
-  min-height: 220px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.signage-band-list {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.signage-call {
   text-align: center;
-  width: 100%;
+  padding: clamp(12px, 2.5vh, 36px) 12px;
+  min-height: 160px;
 }
 
-.signage-call.pulse {
+.signage-call-stage.pulse {
   animation: signage-pulse 1.2s ease;
 }
 
 .signage-call-text {
-  font-size: clamp(32px, 4.5vw, 56px);
+  font-size: clamp(34px, 4.4vw, 64px);
   font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.25;
+  color: #fff;
+  letter-spacing: -0.02em;
 }
 
 .signage-call-seq {
   display: inline-block;
-  font-size: clamp(72px, 12vw, 140px);
   font-weight: 900;
-  line-height: 1;
-  color: #ffd0d0;
-  margin-right: 8px;
-  vertical-align: -0.08em;
+  margin-right: 4px;
 }
 
-.signage-call-idle {
-  font-size: 28px;
-  opacity: 0.75;
-  font-weight: 700;
+.signage-call-idle-title {
+  font-size: clamp(30px, 3.8vw, 56px);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
 }
 
-.signage-card {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  padding: 14px 16px;
-  backdrop-filter: blur(6px);
+.signage-recent {
+  border-top: 1px solid var(--signage-line);
+  padding-top: clamp(12px, 1.6vh, 18px);
+  flex-shrink: 0;
+  min-height: 112px;
 }
 
-.signage-card.called {
-  background: rgba(255, 255, 255, 0.18);
+.signage-recent .signage-accent-label {
+  margin-bottom: 12px;
 }
 
-.signage-seq {
-  font-size: 28px;
+.signage-recent-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.signage-recent-empty {
+  min-height: 72px;
+}
+
+.signage-team-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--signage-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.signage-team-seq {
+  font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 900;
-  color: #ffb4b4;
-  margin-bottom: 6px;
+  color: var(--signage-accent);
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
 }
 
-.signage-wait {
-  margin-top: 8px;
+.signage-team-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: clamp(12px, 1.1vw, 15px);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.signage-team-meta span:last-child {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.92em;
+}
+
+.signage-waiting-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.signage-waiting-title {
+  margin: 0;
+  font-size: clamp(16px, 1.5vw, 22px);
   font-weight: 700;
+  color: #fff;
 }
 
-.signage-empty {
-  margin: auto 0;
-  text-align: center;
-  opacity: 0.7;
-  padding: 24px 8px;
+.signage-waiting-count {
+  font-size: clamp(22px, 2.4vw, 32px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.signage-waiting-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding-right: 2px;
 }
 
 .signage-footer {
-  margin-top: 20px;
+  flex-shrink: 0;
   display: flex;
-  justify-content: space-between;
-  opacity: 0.85;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.95;
+  padding-top: 2px;
 }
 
-.signage-footer .bridge {
-  color: #fff;
+.signage-footer .tbridge-logo img {
+  height: 28px;
 }
 
 @keyframes signage-pulse {
@@ -1119,8 +1316,20 @@ th {
 }
 
 @media (max-width: 1100px) {
-  .signage-band-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .signage-main {
+    grid-template-columns: 1fr;
+  }
+
+  .signage-panel-call {
+    min-height: 300px;
+  }
+
+  .signage-call-stage {
+    min-height: 120px;
+  }
+
+  .signage-recent-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .admin-header {
@@ -1148,9 +1357,10 @@ th {
     font-size: 14px;
   }
 
-  .mini-cancel {
+  .waiting-row-actions {
     grid-column: 1 / -1;
-    justify-self: stretch;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }
 
@@ -1226,6 +1436,10 @@ th {
 
   .waiting-row > span:nth-child(n + 4) {
     grid-column: 2 / -1;
+  }
+
+  .waiting-row-actions {
+    grid-column: 1 / -1;
   }
 
   .filter-box {
@@ -1698,6 +1912,33 @@ th {
   flex: 1;
 }
 
+.receipt-dl {
+  margin: 0;
+  border-top: 1px solid #eceef3;
+}
+
+.receipt-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f1f5;
+  font-size: 14px;
+}
+
+.receipt-row dt {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.receipt-row dd {
+  margin: 0;
+  color: #111827;
+  font-weight: 600;
+  word-break: break-all;
+}
+
 .settings-image-row {
   display: flex;
   align-items: center;
@@ -1756,6 +1997,33 @@ th {
   max-width: 180px;
 }
 
+.settings-dual-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+  align-items: start;
+}
+
+.settings-dual-row.settings-triple-row {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.settings-dual-row > label {
+  margin-bottom: 0;
+}
+
+@media (max-width: 980px) {
+  .settings-dual-row.settings-triple-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-dual-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .section-head {
   display: flex;
   align-items: center;
@@ -1797,20 +2065,104 @@ th {
   font-size: 16px;
 }
 
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-
 @media (max-width: 960px) {
   .admin-layout.sidebar-collapsed {
     grid-template-columns: 1fr;
   }
 
-  .signage-band-list {
-    grid-template-columns: 1fr 1fr;
+  .signage-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
+
+  .signage-clock {
+    align-self: flex-end;
+  }
+}
+
+/* 설정: 테마 / 표시영역 라디오 */
+.settings-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  margin-bottom: 16px;
+}
+
+.settings-radio-label {
+  min-width: 120px;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.settings-radio input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #5b21b6;
+}
+
+.settings-image-preview.wide,
+.settings-image-placeholder.wide {
+  width: 184px;
+  height: 80px;
+  aspect-ratio: 2.3 / 1;
+}
+
+.settings-brand-text {
+  flex: 1;
+  min-width: 140px;
+  max-width: 280px;
+}
+
+.cancel-done-text {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* Fullscreen API 미지원 시 CSS fallback (하단 로고 더블탭) */
+.cw-fs-fallback {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  z-index: 9999;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  background: inherit;
+}
+
+/* 고객 대기 화면 — 원형 링 그래디언트 보더 (mask) */
+.cw-ring-gradient {
+  border-radius: 9999px;
+  padding: clamp(10px, 2vh, 18px);
+  background: linear-gradient(
+    135deg,
+    var(--cw-accent, #e8e0ff) 0%,
+    #c9b8ff 35%,
+    #f5d9ff 65%,
+    var(--cw-accent, #e8e0ff) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
 }

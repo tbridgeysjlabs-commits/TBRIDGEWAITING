@@ -7,6 +7,25 @@ import { useAuth } from '../../context/AuthContext';
 import { useClock } from '../../hooks/useClock';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 
+function useNowMs(intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function formatCountdown(deadlineAt, nowMs) {
+  if (!deadlineAt) return null;
+  const remainMs = new Date(deadlineAt).getTime() - nowMs;
+  if (remainMs <= 0) return null;
+  const totalSec = Math.ceil(remainMs / 1000);
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const ss = String(totalSec % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
 export default function WaitingManagePage() {
   const { facilityCode } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -14,6 +33,7 @@ export default function WaitingManagePage() {
   const { facilityUser, logoutFacility } = useAuth();
   const navigate = useNavigate();
   const now = useClock();
+  const nowMs = useNowMs();
   const { collapsed, toggle } = useSidebarCollapse('tb_admin_sidebar');
   const [board, setBoard] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -103,6 +123,20 @@ export default function WaitingManagePage() {
     }
   };
 
+  const callWaiting = async (id) => {
+    try {
+      const result = await api(`/admin/${facilityCode}/waitings/${id}/call`, {
+        method: 'POST',
+        body: '{}',
+      });
+      showToast(result.toast);
+      setSelectedId(id);
+      await load();
+    } catch (e) {
+      showToast(e.message);
+    }
+  };
+
   const cancel = async (id) => {
     try {
       const result = await api(`/admin/${facilityCode}/waitings/${id}/cancel`, {
@@ -152,39 +186,66 @@ export default function WaitingManagePage() {
         </div>
 
         <div className="waiting-list-box">
-          {list.map((item) => (
-            <div
-              key={item.id}
-              className={`waiting-row ${selectedId === item.id ? 'selected' : ''}`}
-              onClick={() => setSelectedId(item.id)}
-            >
-              <span className="order-circle">{item.order}</span>
-              <span className="seq-badge">{item.dailySeq}번</span>
-              <span className="party-text">인원 {item.totalCount}명</span>
-              <span>{formatTime(item.registeredAt)} 대기 등록</span>
-              <span>{item.waitMinutes}분 기다림</span>
-              {status === 'pending' && (
-                <button
-                  type="button"
-                  className="mini-cancel"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    cancel(item.id);
-                  }}
-                >
-                  대기 취소
-                </button>
-              )}
-              {status === 'completed' && (
-                <span>{formatTime(item.completedAt)} 대기 완료</span>
-              )}
-              {status === 'cancelled' && (
-                <span>
-                  {formatTime(item.cancelledAt)} {item.endLabel || '대기 취소'}
-                </span>
-              )}
-            </div>
-          ))}
+          {list.map((item) => {
+            const isCalling = Boolean(item.calledAt);
+            const countdown = formatCountdown(item.callDeadlineAt, nowMs);
+            const callMissed = isCalling && !countdown;
+
+            return (
+              <div
+                key={item.id}
+                className={`waiting-row ${selectedId === item.id ? 'selected' : ''} ${
+                  isCalling ? 'calling' : ''
+                }`}
+                onClick={() => setSelectedId(item.id)}
+              >
+                <span className="order-circle">{item.order}</span>
+                <span className="seq-badge">{item.dailySeq}번</span>
+                <span className="party-text">인원 {item.totalCount}명</span>
+                <span>{formatTime(item.registeredAt)} 대기 등록</span>
+                <span>{item.waitMinutes}분 기다림</span>
+                {status === 'pending' && (
+                  <div className="waiting-row-actions">
+                    <div className="call-status">
+                      {countdown ? (
+                        <span className="call-timer">입장 대기 시간 {countdown}</span>
+                      ) : callMissed ? (
+                        <span className="call-missed">미입장</span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="mini-call"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        callWaiting(item.id);
+                      }}
+                    >
+                      호출
+                    </button>
+                    <button
+                      type="button"
+                      className="mini-cancel"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancel(item.id);
+                      }}
+                    >
+                      대기 취소
+                    </button>
+                  </div>
+                )}
+                {status === 'completed' && (
+                  <span>{formatTime(item.completedAt)} 대기 완료</span>
+                )}
+                {status === 'cancelled' && (
+                  <span>
+                    {formatTime(item.cancelledAt)} {item.endLabel || '대기 취소'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
           {!list.length && <div className="empty-list">데이터가 없습니다.</div>}
         </div>
 
