@@ -218,6 +218,11 @@ router.post(
   requireAuth(['system_admin']),
   facilityController.cancelCharge
 );
+router.post(
+  '/system-admin/billing/charge',
+  requireAuth(['system_admin']),
+  facilityController.systemCharge
+);
 router.get(
   '/system-admin/notices',
   requireAuth(['system_admin']),

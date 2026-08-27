@@ -7,7 +7,7 @@ const ICON_GLYPH =
   'inline-flex h-[min(100%,2.9rem)] min-h-[40px] min-w-[40px] items-center justify-center text-[clamp(1.2rem,3.2vh,2.1rem)] leading-none text-[var(--cw-text-muted,#9CA3AF)]';
 
 const KEY_BTN =
-  'flex min-h-[40px] items-center justify-center overflow-hidden rounded-[clamp(0.55rem,1.35vh,1.2rem)] border border-[var(--cw-border,rgba(255,255,255,0.06))] bg-[var(--cw-keypad-key,#1A1A24)] font-bold text-[var(--cw-text,#fff)] transition-[transform,filter,background-color] duration-125 ease-out hover:brightness-110 active:scale-[0.96] active:brightness-95';
+  'flex min-h-[40px] items-center justify-center overflow-hidden rounded-[clamp(0.55rem,1.35vh,1.2rem)] border border-[var(--cw-border,rgba(255,255,255,0.06))] bg-[var(--cw-keypad-key,#1A1A24)] font-bold text-[var(--cw-text,#fff)] transition-[transform,filter,background-color,box-shadow] duration-125 ease-out hover:brightness-110 active:scale-[0.96] active:brightness-95 active:bg-[var(--cw-keypad-key-active,var(--cw-keypad-key,#1A1A24))] active:shadow-[var(--cw-keypad-active-shadow,none)]';
 
 function RefreshIcon() {
   return (

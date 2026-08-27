@@ -425,6 +425,44 @@ export const facilityService = {
     };
   },
 
+  /** 시스템 관리자 수동 충전 — NicePay 우회, 충전수단 고정 */
+  async chargeBySystem(facilityCode, amount) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      throw createError(400, '충전 금액을 확인해 주세요.');
+    }
+    const { facility: updated, usage } = await billingRepository.charge(
+      facility.id,
+      value,
+      {
+        note: '시스템 관리자 수동 충전',
+        paymentMethod: '티브리지 충전',
+      }
+    );
+    try {
+      const { kakaoService } = await import('./kakaoService.js');
+      await kakaoService.sendChargeNotice({
+        facility,
+        amount: value,
+        balanceAfter: Number(updated.kakao_balance),
+        eventAt: new Date(),
+      });
+    } catch (err) {
+      console.warn('[charge notice]', err?.message || err);
+    }
+    return {
+      balance: Number(updated.kakao_balance),
+      item: this.mapUsageRow({
+        ...usage,
+        facility_name: facility.name,
+        facility_code: facility.facility_code,
+        kakao_balance: updated.kakao_balance,
+      }),
+    };
+  },
+
   async prepareNicepayCharge(facilityCode, amount) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');

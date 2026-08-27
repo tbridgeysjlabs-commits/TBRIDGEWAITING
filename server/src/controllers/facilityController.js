@@ -253,4 +253,17 @@ export const facilityController = {
       next(err);
     }
   },
+
+  async systemCharge(req, res, next) {
+    try {
+      res.json(
+        await facilityService.chargeBySystem(
+          req.body.facilityCode,
+          req.body.amount
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
 };

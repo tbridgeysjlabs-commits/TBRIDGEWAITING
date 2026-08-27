@@ -22,6 +22,8 @@ export const LIGHT_THEME_VARS = {
   '--cw-accent-deep': '#7C3AED',
   '--cw-keypad-bg': '#f3f0ff',
   '--cw-keypad-key': '#ffffff',
+  '--cw-keypad-key-active': '#ddd6fe',
+  '--cw-keypad-active-shadow': 'inset 0 2px 8px rgba(124, 58, 237, 0.28)',
   '--cw-border': '#e9e5f5',
   '--cw-panel-border': '#e9e5f5',
   '--cw-ring': '#A78BFA',

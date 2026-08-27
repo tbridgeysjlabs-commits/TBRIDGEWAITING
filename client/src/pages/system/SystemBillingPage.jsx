@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
+import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -45,6 +46,11 @@ export default function SystemBillingPage() {
   const [cancelAmount, setCancelAmount] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [receiptItem, setReceiptItem] = useState(null);
+  const [chargeOpen, setChargeOpen] = useState(false);
+  const [facilities, setFacilities] = useState([]);
+  const [chargeFacilityCode, setChargeFacilityCode] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [charging, setCharging] = useState(false);
 
   const loadSends = async () => {
     const params = new URLSearchParams({
@@ -80,6 +86,56 @@ export default function SystemBillingPage() {
     setPage(1);
     const run = tab === 'summary' ? loadSends : loadCharges;
     run().catch((e) => setToast(e.message));
+  };
+
+  const openCharge = async () => {
+    try {
+      const list = await api('/system-admin/facilities', {}, 'system');
+      setFacilities(Array.isArray(list) ? list : []);
+      setChargeFacilityCode('');
+      setChargeAmount('');
+      setChargeOpen(true);
+    } catch (e) {
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    }
+  };
+
+  const closeCharge = () => {
+    setChargeOpen(false);
+    setChargeFacilityCode('');
+    setChargeAmount('');
+  };
+
+  const canCharge =
+    !!chargeFacilityCode && Number(chargeAmount) > 0 && !charging;
+
+  const submitCharge = async () => {
+    if (!canCharge) return;
+    setCharging(true);
+    try {
+      await api(
+        '/system-admin/billing/charge',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            facilityCode: chargeFacilityCode,
+            amount: Number(chargeAmount),
+          }),
+        },
+        'system'
+      );
+      closeCharge();
+      setToast('충전이 완료되었습니다.');
+      setTimeout(() => setToast(''), 2500);
+      setPage(1);
+      await loadCharges();
+    } catch (e) {
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    } finally {
+      setCharging(false);
+    }
   };
 
   const openCancel = (item) => {
@@ -235,7 +291,9 @@ export default function SystemBillingPage() {
         {tab === 'charges' && (
           <>
             <div className="list-toolbar">
-              <span />
+              <button type="button" className="btn-primary" onClick={openCharge}>
+                충전하기
+              </button>
               <label>
                 페이지당 리스트 수
                 <select
@@ -347,6 +405,73 @@ export default function SystemBillingPage() {
           </div>
         </div>
       </main>
+
+      {chargeOpen && (
+        <div className="modal-backdrop" onClick={() => !charging && closeCharge()}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="close-btn abs"
+              disabled={charging}
+              onClick={closeCharge}
+              aria-label="닫기"
+            >
+              <AdminCloseIcon />
+            </button>
+            <h2>충전하기</h2>
+            <label>
+              시설사
+              <select
+                value={chargeFacilityCode}
+                onChange={(e) => setChargeFacilityCode(e.target.value)}
+              >
+                <option value="">시설사를 선택해 주세요</option>
+                {facilities.map((f) => (
+                  <option key={f.id || f.facilityCode} value={f.facilityCode}>
+                    {f.name} ({f.facilityCode})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              충전 금액
+              <div className="inline-unit">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  placeholder="금액 입력"
+                  value={chargeAmount}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    setChargeAmount(v);
+                  }}
+                />
+                <span>원</span>
+              </div>
+            </label>
+            <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={charging}
+                onClick={closeCharge}
+              >
+                취소하기
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!canCharge}
+                onClick={submitCharge}
+              >
+                {charging ? '처리 중...' : '충전하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cancelTarget && (
         <div className="modal-backdrop" onClick={() => !cancelling && setCancelTarget(null)}>

@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import PasswordChecklist from '../../components/PasswordChecklist';
+import PasswordChangeModal from '../../components/PasswordChangeModal';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
-import { validatePassword } from '../../utils/passwordPolicy';
 
 export default function SystemSettingsPage() {
   const { systemUser, logoutSystem } = useAuth();
@@ -16,11 +15,7 @@ export default function SystemSettingsPage() {
   const [saved, setSaved] = useState('');
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
-  const [pwForm, setPwForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [pwOpen, setPwOpen] = useState(false);
   const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
@@ -63,39 +58,21 @@ export default function SystemSettingsPage() {
     }
   };
 
-  const changePassword = async () => {
-    if (!pwForm.currentPassword || !pwForm.newPassword) {
-      showToast('현재 비밀번호와 새 비밀번호를 입력해 주세요.');
-      return;
-    }
-    if (pwForm.newPassword !== pwForm.confirmPassword) {
-      showToast('새 비밀번호 확인이 일치하지 않습니다.');
-      return;
-    }
-    const check = validatePassword(pwForm.newPassword, {
-      username: systemUser?.username,
-    });
-    if (!check.valid) {
-      showToast(check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
-      return;
-    }
+  const changePassword = async ({ currentPassword, newPassword }) => {
     setPwSaving(true);
     try {
       await api(
         '/system-admin/password',
         {
           method: 'PUT',
-          body: JSON.stringify({
-            currentPassword: pwForm.currentPassword,
-            newPassword: pwForm.newPassword,
-          }),
+          body: JSON.stringify({ currentPassword, newPassword }),
         },
         'system'
       );
-      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPwOpen(false);
       showToast('비밀번호가 변경되었습니다.');
     } catch (err) {
-      showToast(err.message);
+      throw err;
     } finally {
       setPwSaving(false);
     }
@@ -133,55 +110,20 @@ export default function SystemSettingsPage() {
 
         <section className="settings-section" style={{ marginTop: 28 }}>
           <h2>비밀번호 변경</h2>
-          <label>
-            현재 비밀번호
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={pwForm.currentPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, currentPassword: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            새 비밀번호
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={pwForm.newPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, newPassword: e.target.value })
-              }
-            />
-            {pwForm.newPassword ? (
-              <PasswordChecklist
-                password={pwForm.newPassword}
-                username={systemUser?.username}
-              />
-            ) : null}
-          </label>
-          <label>
-            새 비밀번호 확인
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={pwForm.confirmPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, confirmPassword: e.target.value })
-              }
-            />
-          </label>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={pwSaving}
-            onClick={() => changePassword().catch(() => {})}
-          >
+          <button type="button" className="btn-primary" onClick={() => setPwOpen(true)}>
             비밀번호 변경
           </button>
         </section>
       </main>
+
+      <PasswordChangeModal
+        open={pwOpen}
+        username={systemUser?.username}
+        saving={pwSaving}
+        onClose={() => setPwOpen(false)}
+        onSubmit={changePassword}
+        onError={showToast}
+      />
     </div>
   );
 }

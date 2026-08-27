@@ -73,8 +73,8 @@ function WaitingStatsCard({ facility, t, lang }) {
   );
 }
 
-function KioskNoticeCard({ html, title }) {
-  const content = String(html || '').trim();
+function KioskNoticeCard({ text, title }) {
+  const content = String(text || '').trim();
   if (!content) return null;
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[clamp(0.9rem,1.8vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.9rem,2vw,1.5rem)] py-[clamp(0.75rem,1.8vh,1.25rem)]">
@@ -82,10 +82,9 @@ function KioskNoticeCard({ html, title }) {
         {title}
       </h3>
       <div className="my-2 h-px w-full shrink-0 bg-[var(--cw-border,rgba(0,0,0,0.08))]" />
-      <div
-        className="min-h-0 flex-1 overflow-y-auto text-[clamp(0.8rem,1.7vh,1rem)] leading-relaxed text-[var(--cw-text,#1f1a33)] opacity-90 [&_li]:mb-1 [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
+      <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-line text-[clamp(0.8rem,1.7vh,1rem)] leading-relaxed text-[var(--cw-text,#1f1a33)] opacity-90">
+        {content}
+      </div>
     </div>
   );
 }
@@ -181,14 +180,14 @@ export default function CustomerShell() {
       <div className="flex h-full w-full">
         <aside className="flex h-full w-1/2 min-w-0 justify-center px-[clamp(0.75rem,2vw,1.5rem)] py-[clamp(0.75rem,2vh,1.25rem)]">
           <div className={`${PANEL} gap-[clamp(0.65rem,1.6vh,1.15rem)]`}>
-            <div className="flex w-full shrink-0 items-center gap-[clamp(0.5rem,1.2vw,1rem)]">
-              <TBridgeLogo
-                className="h-[clamp(1.35rem,2.8vh,2.1rem)] w-auto shrink-0"
-                enableFullscreenTap
-                onPointerUp={onLogoPointerUp}
-                onClick={onLogoClick}
-              />
-              {showLangSelector ? (
+            {showLangSelector ? (
+              <div className="flex w-full shrink-0 items-center gap-[clamp(0.5rem,1.2vw,1rem)]">
+                <TBridgeLogo
+                  className="h-[clamp(1.35rem,2.8vh,2.1rem)] w-auto shrink-0"
+                  enableFullscreenTap
+                  onPointerUp={onLogoPointerUp}
+                  onClick={onLogoClick}
+                />
                 <div className="min-w-0 flex-1">
                   <LanguagePillSelector
                     lang={lang}
@@ -197,15 +196,26 @@ export default function CustomerShell() {
                     align="start"
                   />
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             <FacilityBrand facility={facility} />
             <WaitingStatsCard facility={facility} t={t} lang={lang} />
             <KioskNoticeCard
-              html={facility.kioskNotice}
+              text={facility.kioskNotice}
               title={t('notice') || '공지사항'}
             />
+
+            {!showLangSelector ? (
+              <div className="mt-auto flex w-full shrink-0 justify-center pt-[clamp(0.5rem,1.2vh,1rem)]">
+                <TBridgeLogo
+                  className="h-[clamp(1.35rem,2.8vh,2.1rem)] w-auto"
+                  enableFullscreenTap
+                  onPointerUp={onLogoPointerUp}
+                  onClick={onLogoClick}
+                />
+              </div>
+            ) : null}
           </div>
         </aside>
 

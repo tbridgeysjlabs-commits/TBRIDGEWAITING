@@ -4,11 +4,10 @@ import { api } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import HtmlEditor from '../../components/HtmlEditor';
-import PasswordChecklist from '../../components/PasswordChecklist';
+import PasswordChangeModal from '../../components/PasswordChangeModal';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
-import { validatePassword } from '../../utils/passwordPolicy';
 
 const TOGGLE_LANGS = [
   { code: 'en', label: '영어', key: 'En' },
@@ -44,11 +43,7 @@ export default function SettingsPage() {
   const [toast, setToast] = useState('');
   const [dragIndex, setDragIndex] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [pwForm, setPwForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [pwOpen, setPwOpen] = useState(false);
   const [pwSaving, setPwSaving] = useState(false);
   const dirtyRef = useRef(false);
   const saveRef = useRef(async () => {});
@@ -374,35 +369,17 @@ export default function SettingsPage() {
   const canSave =
     dirty && form?.name?.trim() && types.every((t) => t.nameKo.trim()) && !saving;
 
-  const changePassword = async () => {
-    if (!pwForm.currentPassword || !pwForm.newPassword) {
-      showToast('현재 비밀번호와 새 비밀번호를 입력해 주세요.');
-      return;
-    }
-    if (pwForm.newPassword !== pwForm.confirmPassword) {
-      showToast('새 비밀번호 확인이 일치하지 않습니다.');
-      return;
-    }
-    const check = validatePassword(pwForm.newPassword, {
-      username: facilityUser?.username,
-    });
-    if (!check.valid) {
-      showToast(check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
-      return;
-    }
+  const changePassword = async ({ currentPassword, newPassword }) => {
     setPwSaving(true);
     try {
       await api(`/admin/${facilityCode}/password`, {
         method: 'PUT',
-        body: JSON.stringify({
-          currentPassword: pwForm.currentPassword,
-          newPassword: pwForm.newPassword,
-        }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
-      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPwOpen(false);
       showToast('비밀번호가 변경되었습니다.');
     } catch (err) {
-      showToast(err.message);
+      throw err;
     } finally {
       setPwSaving(false);
     }
@@ -605,10 +582,10 @@ export default function SettingsPage() {
           </div>
 
           <label>
-            안내 사항
+            웨이팅 완료 모바일 페이지내 안내사항
             <textarea
               rows={5}
-              placeholder="안내 사항 입력"
+              placeholder="웨이팅 완료 모바일 페이지내 안내사항 입력"
               value={form.storeNotice || ''}
               onChange={(e) => setForm({ ...form, storeNotice: e.target.value })}
             />
@@ -741,12 +718,16 @@ export default function SettingsPage() {
                 <h3>{lang.label}</h3>
                 <label>
                   키오스크 공지사항
-                  <HtmlEditor
-                    value={form[`kioskNotice${lang.key}`] || ''}
-                    onChange={(html) =>
-                      setForm({ ...form, [`kioskNotice${lang.key}`]: html })
-                    }
+                  <textarea
+                    rows={5}
                     placeholder="공지사항 본문을 입력해 주세요"
+                    value={form[`kioskNotice${lang.key}`] || ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        [`kioskNotice${lang.key}`]: e.target.value,
+                      })
+                    }
                   />
                 </label>
               </div>
@@ -800,50 +781,10 @@ export default function SettingsPage() {
 
         <section className="settings-section">
           <h2>비밀번호 변경</h2>
-          <label>
-            현재 비밀번호
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={pwForm.currentPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, currentPassword: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            새 비밀번호
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={pwForm.newPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, newPassword: e.target.value })
-              }
-            />
-            {pwForm.newPassword ? (
-              <PasswordChecklist
-                password={pwForm.newPassword}
-                username={facilityUser?.username}
-              />
-            ) : null}
-          </label>
-          <label>
-            새 비밀번호 확인
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={pwForm.confirmPassword}
-              onChange={(e) =>
-                setPwForm({ ...pwForm, confirmPassword: e.target.value })
-              }
-            />
-          </label>
           <button
             type="button"
             className="btn-primary"
-            disabled={pwSaving}
-            onClick={() => changePassword().catch(() => {})}
+            onClick={() => setPwOpen(true)}
           >
             비밀번호 변경
           </button>
@@ -858,6 +799,15 @@ export default function SettingsPage() {
           저장
         </button>
       </main>
+
+      <PasswordChangeModal
+        open={pwOpen}
+        username={facilityUser?.username}
+        saving={pwSaving}
+        onClose={() => setPwOpen(false)}
+        onSubmit={changePassword}
+        onError={showToast}
+      />
     </div>
   );
 }
