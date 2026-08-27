@@ -125,12 +125,31 @@ export const waitingRepository = {
   },
 
   async create(data) {
+    const termsOfUseAgreed = !!data.termsOfUseAgreed;
+    const privacyAgreed = !!data.privacyAgreed;
+    const marketingAgreed = !!data.marketingAgreed;
+    const termsAgreed =
+      data.termsAgreed != null
+        ? !!data.termsAgreed
+        : termsOfUseAgreed && privacyAgreed;
+
     const { rows } = await query(
       `INSERT INTO waitings (
          facility_id, daily_seq, phone, party_counts, total_count,
-         status, marketing_agreed, terms_agreed, registered_at, entry_date,
+         status, marketing_agreed, terms_agreed,
+         terms_of_use_agreed, terms_of_use_agreed_at,
+         privacy_agreed, privacy_agreed_at,
+         marketing_agreed_at,
+         registered_at, entry_date,
          queue_order, complete_page_link, postpone_count
-       ) VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,NOW(),CURRENT_DATE,$8,$9,0)
+       ) VALUES (
+         $1,$2,$3,$4,$5,'pending',$6,$7,
+         $8, CASE WHEN $8 THEN NOW() ELSE NULL END,
+         $9, CASE WHEN $9 THEN NOW() ELSE NULL END,
+         CASE WHEN $6 THEN NOW() ELSE NULL END,
+         NOW(),CURRENT_DATE,
+         $10,$11,0
+       )
        RETURNING *`,
       [
         data.facilityId,
@@ -138,8 +157,10 @@ export const waitingRepository = {
         data.phone,
         JSON.stringify(data.partyCounts),
         data.totalCount,
-        data.marketingAgreed,
-        data.termsAgreed ?? true,
+        marketingAgreed,
+        termsAgreed,
+        termsOfUseAgreed,
+        privacyAgreed,
         data.queueOrder,
         data.completePageLink,
       ]

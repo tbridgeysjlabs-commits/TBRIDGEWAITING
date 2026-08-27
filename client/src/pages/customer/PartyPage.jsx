@@ -39,8 +39,9 @@ export default function PartyPage() {
           <StepPageHeader
             title={t('party_title')}
             onBack={() => navigate(`/w/${facilityCode}`)}
+            step={2}
           />
-          <p className="mb-[clamp(0.5rem,1.5vh,1rem)] text-center text-[clamp(0.9rem,2vh,1.25rem)] text-[var(--cw-text-muted,#9ca3af)]">
+          <p className="mb-[clamp(0.5rem,1.5vh,1rem)] mt-[30px] text-center text-[clamp(0.9rem,2vh,1.25rem)] text-[var(--cw-text-muted,#9CA3AF)]">
             {typeHint
               ? t('party_types_hint', { types: typeHint })
               : t('party_hint')}
@@ -82,6 +83,18 @@ export default function PartyPage() {
             }
           />
         ))}
+
+        <div className="mt-2 flex items-center justify-between border-t border-[var(--cw-border,rgba(255,255,255,0.08))] px-1 pt-4">
+          <span className="text-[clamp(0.9rem,1.9vh,1.05rem)] text-[var(--cw-text-muted,#9CA3AF)]">
+            총 입장 인원
+          </span>
+          <span className="text-[clamp(1rem,2.2vh,1.2rem)] font-bold text-[var(--cw-text,#fff)]">
+            <span className="text-[clamp(1.25rem,2.8vh,1.55rem)] text-[var(--cw-accent,#A78BFA)]">
+              {total}
+            </span>{' '}
+            명
+          </span>
+        </div>
       </div>
     </CustomerStepLayout>
   );

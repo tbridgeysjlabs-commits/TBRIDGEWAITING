@@ -137,33 +137,13 @@ async function migrate() {
     'BOOLEAN NOT NULL DEFAULT FALSE'
   );
 
-  // 약관 3종 → 단일 terms_of_use 통합 (기존 privacy/marketing 본문을 합친 뒤 비움)
+  // terms_agreed 백필 (약관 본문은 terms / privacy / marketing 3종으로 분리 유지)
   await addColumn('waitings', 'terms_agreed', 'BOOLEAN NOT NULL DEFAULT FALSE');
   await query(`
     UPDATE waitings
     SET terms_agreed = TRUE
     WHERE terms_agreed = FALSE AND marketing_agreed = TRUE
   `).catch(() => {});
-
-  const mergePair = async (target, privacyCol, marketingCol) => {
-    await query(`
-      UPDATE facility_settings SET
-        ${target} = TRIM(BOTH E'\\n' FROM CONCAT_WS(E'\\n\\n',
-          NULLIF(TRIM(${target}), ''),
-          NULLIF(TRIM(${privacyCol}), ''),
-          NULLIF(TRIM(${marketingCol}), '')
-        )),
-        ${privacyCol} = '',
-        ${marketingCol} = ''
-      WHERE TRIM(COALESCE(${privacyCol}, '')) <> ''
-         OR TRIM(COALESCE(${marketingCol}, '')) <> ''
-    `);
-  };
-  await mergePair('terms_of_use', 'privacy_policy', 'marketing_policy');
-  await mergePair('terms_of_use_en', 'privacy_policy_en', 'marketing_policy_en');
-  await mergePair('terms_of_use_ja', 'privacy_policy_ja', 'marketing_policy_ja');
-  await mergePair('terms_of_use_zh', 'privacy_policy_zh', 'marketing_policy_zh');
-  console.log('~ facility_settings terms merged into terms_of_use*');
 
   // NicePay charge tracking
   await addColumn('usage_history', 'pg_tid', 'VARCHAR(40)');
@@ -195,6 +175,55 @@ async function migrate() {
      ON usage_history(facility_id, created_at DESC)`
   );
 
+  // 약관 동의 항목별 저장
+  await addColumn('waitings', 'terms_of_use_agreed', 'BOOLEAN NOT NULL DEFAULT FALSE');
+  await addColumn('waitings', 'terms_of_use_agreed_at', 'TIMESTAMPTZ');
+  await addColumn('waitings', 'privacy_agreed', 'BOOLEAN NOT NULL DEFAULT FALSE');
+  await addColumn('waitings', 'privacy_agreed_at', 'TIMESTAMPTZ');
+  await addColumn('waitings', 'marketing_agreed_at', 'TIMESTAMPTZ');
+  await query(`
+    UPDATE waitings
+    SET terms_of_use_agreed = TRUE,
+        terms_of_use_agreed_at = COALESCE(terms_of_use_agreed_at, registered_at),
+        privacy_agreed = TRUE,
+        privacy_agreed_at = COALESCE(privacy_agreed_at, registered_at)
+    WHERE terms_agreed = TRUE
+      AND (terms_of_use_agreed = FALSE OR privacy_agreed = FALSE)
+  `);
+
+  // 매장 안내 / 광고 영역
+  await addColumn('facility_settings', 'store_notice', `TEXT NOT NULL DEFAULT ''`);
+  await addColumn('facility_settings', 'ad_area_enabled', 'BOOLEAN NOT NULL DEFAULT TRUE');
+
+  // 공지사항
+  await query(`
+    CREATE TABLE IF NOT EXISTS notices (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      version VARCHAR(40) NOT NULL DEFAULT '',
+      title VARCHAR(300) NOT NULL,
+      content_html TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_notices_created ON notices(created_at DESC)`
+  );
+
+  // 시스템 전역 설정
+  await query(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(`
+    INSERT INTO system_settings (key, value)
+    VALUES ('admin_contact', '')
+    ON CONFLICT (key) DO NOTHING
+  `);
+
   await query(`
     INSERT INTO customers (facility_id, phone_number, marketing_agreed, marketing_agreed_at, first_registered_at)
     SELECT DISTINCT ON (facility_id, phone)
@@ -206,6 +235,53 @@ async function migrate() {
     ON CONFLICT (facility_id, phone_number) DO UPDATE SET
       first_registered_at = COALESCE(customers.first_registered_at, EXCLUDED.first_registered_at)
   `);
+
+  // 로그인 시도 제한
+  await addColumn('system_admins', 'failed_login_count', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumn('system_admins', 'locked_until', 'TIMESTAMPTZ');
+  await addColumn('facilities', 'failed_login_count', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumn('facilities', 'locked_until', 'TIMESTAMPTZ');
+
+  // 키오스크: 1팀당 예상 대기(분) + 다국어 공지
+  await addColumn(
+    'facility_settings',
+    'avg_wait_minutes_per_team',
+    'INTEGER NOT NULL DEFAULT 5'
+  );
+  await addColumn('facility_settings', 'kiosk_notice', `TEXT NOT NULL DEFAULT ''`);
+  await addColumn('facility_settings', 'kiosk_notice_en', `TEXT NOT NULL DEFAULT ''`);
+  await addColumn('facility_settings', 'kiosk_notice_ja', `TEXT NOT NULL DEFAULT ''`);
+  await addColumn('facility_settings', 'kiosk_notice_zh', `TEXT NOT NULL DEFAULT ''`);
+
+  // 카카오 알림톡 템플릿 초기화 → 신규 8종
+  await query(`DELETE FROM kakao_templates`).catch(() => {});
+  const demoFacility = await query(
+    `SELECT id FROM facilities WHERE facility_code = 'demo-park' LIMIT 1`
+  ).catch(() => ({ rows: [] }));
+  if (demoFacility.rows[0]) {
+    const fid = demoFacility.rows[0].id;
+    const templates = [
+      ['ppur_2026081911072324417655171', '웨이팅 등록 완료 안내'],
+      ['ppur_2026081911054024417231502', '입장 임박 안내'],
+      ['ppur_2026081911043647407558286', '입장 안내'],
+      ['ppur_2026081911024547407465933', '미입장 웨이팅 취소 안내'],
+      ['ppur_2026081911012247407706584', '웨이팅 순서 변경 완료 안내'],
+      ['ppur_2026081910595547407136242', '웨이팅 취소 완료 안내'],
+      ['ppur_2026081812234847407727731', '티브리지 웨이팅 환불 안내'],
+      ['ppur_2026081812114047407778284', '티브리지 웨이팅 충전 안내'],
+    ];
+    for (const [code, name] of templates) {
+      await query(
+        `INSERT INTO kakao_templates (
+           facility_id, template_code, template_name, content, sender_key
+         ) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (facility_id, template_code) DO UPDATE
+           SET template_name = EXCLUDED.template_name,
+               content = EXCLUDED.content`,
+        [fid, code, name, name, 'SENDER_DEMO_KEY']
+      );
+    }
+  }
 
   console.log('Migration completed.');
   await pool.end();

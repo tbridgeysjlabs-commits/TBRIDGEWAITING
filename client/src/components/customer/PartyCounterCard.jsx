@@ -5,7 +5,7 @@ function MinusIcon({ className = '' }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="2.2"
       strokeLinecap="round"
       aria-hidden
     >
@@ -21,7 +21,7 @@ function PlusIcon({ className = '' }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="2.2"
       strokeLinecap="round"
       aria-hidden
     >
@@ -30,32 +30,44 @@ function PlusIcon({ className = '' }) {
   );
 }
 
-export default function PartyCounterCard({ name, value, onChange }) {
+export default function PartyCounterCard({ name, value, onChange, description }) {
+  const canDecrease = value > 0;
   return (
-    <div className="flex items-center justify-between rounded-[clamp(1.25rem,2.5vh,2.25rem)] bg-[var(--cw-card,#fff)] px-[clamp(1.25rem,2.5vw,2.25rem)] py-[clamp(0.7rem,2vh,1.35rem)] shadow-[0_8px_30px_rgba(120,100,180,0.08)]">
-      <span className="text-[clamp(1.15rem,2.8vh,1.7rem)] font-extrabold text-[var(--cw-text,#1f1a33)]">
-        {name}
-      </span>
-      <div className="flex items-center gap-[clamp(0.75rem,1.8vw,1.5rem)]">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-card,#1A1A24)] px-[clamp(1.1rem,2.2vw,1.75rem)] py-[clamp(0.85rem,2.2vh,1.35rem)]">
+      <div className="min-w-0">
+        <div className="truncate text-[clamp(1.05rem,2.4vh,1.35rem)] font-bold text-[var(--cw-text,#fff)]">
+          {name}
+        </div>
+        {description ? (
+          <div className="mt-0.5 truncate text-[clamp(0.75rem,1.6vh,0.9rem)] text-[var(--cw-text-muted,#9CA3AF)]">
+            {description}
+          </div>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-[clamp(0.65rem,1.5vw,1.1rem)]">
         <button
           type="button"
           onClick={() => onChange(-1)}
-          disabled={value <= 0}
+          disabled={!canDecrease}
           aria-label="decrease"
-          className="flex h-[clamp(2.75rem,6.5vh,4.1rem)] w-[clamp(2.75rem,6.5vh,4.1rem)] items-center justify-center rounded-full bg-[var(--cw-panel-alt,#efeafc)] text-[var(--cw-accent,#5a4b8a)] transition enabled:active:scale-95 disabled:opacity-35"
+          className={`flex h-[clamp(2.5rem,5.5vh,3.25rem)] w-[clamp(2.5rem,5.5vh,3.25rem)] items-center justify-center rounded-xl transition enabled:active:scale-95 ${
+            canDecrease
+              ? 'bg-[var(--cw-panel-alt,#22222E)] text-[var(--cw-text,#fff)]'
+              : 'bg-[var(--cw-panel-alt,#22222E)] text-[var(--cw-disabled-fg,#6B7280)] opacity-50'
+          }`}
         >
-          <MinusIcon className="h-[clamp(1.25rem,3vh,2rem)] w-[clamp(1.25rem,3vh,2rem)]" />
+          <MinusIcon className="h-5 w-5" />
         </button>
-        <span className="min-w-10 text-center text-[clamp(1.35rem,3.5vh,2.25rem)] font-extrabold text-[var(--cw-text,#1f1a33)]">
+        <span className="min-w-8 text-center text-[clamp(1.35rem,3.2vh,1.85rem)] font-extrabold tabular-nums text-[var(--cw-text,#fff)]">
           {value}
         </span>
         <button
           type="button"
           onClick={() => onChange(1)}
           aria-label="increase"
-          className="flex h-[clamp(2.75rem,6.5vh,4.1rem)] w-[clamp(2.75rem,6.5vh,4.1rem)] items-center justify-center rounded-full bg-[var(--cw-panel-alt,#efeafc)] text-[var(--cw-accent,#5a4b8a)] transition active:scale-95"
+          className="flex h-[clamp(2.5rem,5.5vh,3.25rem)] w-[clamp(2.5rem,5.5vh,3.25rem)] items-center justify-center rounded-xl bg-[var(--cw-accent-deep,#7C3AED)] text-white transition active:scale-95"
         >
-          <PlusIcon className="h-[clamp(1.25rem,3vh,2rem)] w-[clamp(1.25rem,3vh,2rem)]" />
+          <PlusIcon className="h-5 w-5" />
         </button>
       </div>
     </div>

@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
+import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
+import PasswordChecklist from '../../components/PasswordChecklist';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import { validatePassword } from '../../utils/passwordPolicy';
 
 const emptyForm = {
   name: '',
@@ -15,14 +18,32 @@ const emptyForm = {
   status: 'active',
 };
 
+function snapshotOf(form) {
+  return JSON.stringify({
+    name: form.name,
+    facilityCode: form.facilityCode,
+    masterUsername: form.masterUsername,
+    masterPassword: form.masterPassword,
+    kakaoUnitCost: String(form.kakaoUnitCost ?? ''),
+    status: form.status,
+  });
+}
+
 export default function FacilitiesPage() {
   const { systemUser, logoutSystem } = useAuth();
   const navigate = useNavigate();
   const { collapsed, toggle } = useSidebarCollapse('tb_system_sidebar');
   const [facilities, setFacilities] = useState([]);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState('create');
   const [form, setForm] = useState(emptyForm);
+  const [initialSnapshot, setInitialSnapshot] = useState('');
   const [toast, setToast] = useState('');
+
+  const dirty = useMemo(() => {
+    if (!open || mode !== 'edit') return false;
+    return snapshotOf(form) !== initialSnapshot;
+  }, [open, mode, form, initialSnapshot]);
 
   const load = () => api('/system-admin/facilities', {}, 'system').then(setFacilities);
 
@@ -31,30 +52,121 @@ export default function FacilitiesPage() {
     load().catch((e) => setToast(e.message));
   }, [systemUser]);
 
+  const closeModal = () => {
+    setOpen(false);
+    setMode('create');
+    setForm(emptyForm);
+    setInitialSnapshot('');
+  };
+
+  const requestClose = () => {
+    if (mode === 'edit' && dirty) {
+      const ok = window.confirm('변경사항이 저장되지 않았습니다. 그래도 닫으시겠습니까?');
+      if (!ok) return;
+    }
+    closeModal();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      if (mode === 'edit' && dirty) {
+        const ok = window.confirm('변경사항이 저장되지 않았습니다. 그래도 닫으시겠습니까?');
+        if (!ok) return;
+      }
+      closeModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, mode, dirty]);
+
   if (!systemUser) return <Navigate to="/system-admin/login" replace />;
 
-  const create = async (e) => {
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const openCreate = () => {
+    setMode('create');
+    setForm(emptyForm);
+    setInitialSnapshot('');
+    setOpen(true);
+  };
+
+  const openEdit = (facility) => {
+    const next = {
+      name: facility.name || '',
+      facilityCode: facility.facilityCode || '',
+      masterUsername: facility.masterUsername || '',
+      masterPassword: '',
+      kakaoUnitCost: String(facility.kakaoUnitCost ?? 20),
+      status: facility.status === 'withdraw' || facility.status === 'inactive' ? 'withdraw' : 'active',
+    };
+    setMode('edit');
+    setForm(next);
+    setInitialSnapshot(snapshotOf(next));
+    setOpen(true);
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
+    if (mode === 'edit' && !dirty) return;
+    const needsPasswordCheck =
+      mode === 'create' || String(form.masterPassword || '').length > 0;
+    if (needsPasswordCheck) {
+      const check = validatePassword(form.masterPassword, {
+        username: form.masterUsername,
+      });
+      if (!check.valid) {
+        showToast(check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
+        return;
+      }
+    }
     try {
-      const created = await api(
-        '/system-admin/facilities',
+      if (mode === 'create') {
+        const created = await api(
+          '/system-admin/facilities',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              ...form,
+              kakaoUnitCost: Number(form.kakaoUnitCost),
+            }),
+          },
+          'system'
+        );
+        closeModal();
+        await load();
+        showToast(`등록 완료: ${created.facilityCode}`);
+        return;
+      }
+
+      const body = {
+        name: form.name,
+        masterUsername: form.masterUsername,
+        kakaoUnitCost: Number(form.kakaoUnitCost),
+        status: form.status,
+      };
+      if (form.masterPassword) {
+        body.masterPassword = form.masterPassword;
+      }
+
+      await api(
+        `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}`,
         {
-          method: 'POST',
-          body: JSON.stringify({
-            ...form,
-            kakaoUnitCost: Number(form.kakaoUnitCost),
-          }),
+          method: 'PUT',
+          body: JSON.stringify(body),
         },
         'system'
       );
-      setOpen(false);
-      setForm(emptyForm);
+      closeModal();
       await load();
-      setToast(`등록 완료: ${created.facilityCode}`);
-      setTimeout(() => setToast(''), 2500);
+      showToast('수정 완료');
     } catch (err) {
-      setToast(err.message);
-      setTimeout(() => setToast(''), 2500);
+      showToast(err.message);
     }
   };
 
@@ -72,7 +184,7 @@ export default function FacilitiesPage() {
       <main className="admin-main">
         <div className="page-title-row">
           <h1>시설사 관리</h1>
-          <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
+          <button type="button" className="btn-primary" onClick={openCreate}>
             시설사 등록
           </button>
         </div>
@@ -94,7 +206,24 @@ export default function FacilitiesPage() {
             <tbody>
               {facilities.map((f) => (
                 <tr key={f.id}>
-                  <td>{f.name}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(f)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        margin: 0,
+                        color: 'inherit',
+                        font: 'inherit',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f.name}
+                    </button>
+                  </td>
                   <td>{f.facilityCode}</td>
                   <td>
                     <a href={f.links.customer} target="_blank" rel="noreferrer">
@@ -121,13 +250,16 @@ export default function FacilitiesPage() {
         </div>
 
         {open && (
-          <div className="modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="modal-backdrop" onClick={requestClose}>
             <form
               className="modal-card"
               onClick={(e) => e.stopPropagation()}
-              onSubmit={create}
+              onSubmit={submit}
             >
-              <h2>시설사 등록</h2>
+              <button type="button" className="close-btn abs" onClick={requestClose} aria-label="닫기">
+                <AdminCloseIcon />
+              </button>
+              <h2>{mode === 'edit' ? '시설사 수정' : '시설사 등록'}</h2>
               <label>
                 시설사명
                 <input
@@ -142,6 +274,7 @@ export default function FacilitiesPage() {
                   value={form.facilityCode}
                   onChange={(e) => setForm({ ...form, facilityCode: e.target.value })}
                   required
+                  readOnly={mode === 'edit'}
                 />
               </label>
               <label>
@@ -158,8 +291,16 @@ export default function FacilitiesPage() {
                   type="password"
                   value={form.masterPassword}
                   onChange={(e) => setForm({ ...form, masterPassword: e.target.value })}
-                  required
+                  required={mode === 'create'}
+                  placeholder={mode === 'edit' ? '변경 시에만 입력' : undefined}
+                  autoComplete={mode === 'edit' ? 'new-password' : 'off'}
                 />
+                {(mode === 'create' || form.masterPassword) && (
+                  <PasswordChecklist
+                    password={form.masterPassword}
+                    username={form.masterUsername}
+                  />
+                )}
               </label>
               <label>
                 카카오 알림톡 발송 비용
@@ -185,13 +326,29 @@ export default function FacilitiesPage() {
                   <option value="withdraw">탈퇴(WITHDRAW)</option>
                 </select>
               </label>
-              <div className="modal-actions">
-                <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-                  취소
-                </button>
-                <button type="submit" className="btn-primary">
-                  등록
-                </button>
+              <div
+                className="modal-actions"
+                style={mode === 'edit' ? { justifyContent: 'space-between' } : undefined}
+              >
+                {mode === 'edit' ? (
+                  <>
+                    <button type="button" className="btn-ghost" onClick={closeModal}>
+                      닫기
+                    </button>
+                    <button type="submit" className="btn-primary" disabled={!dirty}>
+                      수정
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="btn-ghost" onClick={closeModal}>
+                      취소
+                    </button>
+                    <button type="submit" className="btn-primary">
+                      등록
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </div>

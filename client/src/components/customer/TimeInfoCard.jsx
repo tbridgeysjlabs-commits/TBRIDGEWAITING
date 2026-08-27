@@ -17,7 +17,7 @@ function parts(now = new Date(), lang = 'ko') {
   };
 }
 
-export default function TimeInfoCard({ label = '지금 시간', lang = 'ko' }) {
+export default function TimeInfoCard({ label = '지금 시간', lang = 'ko', compact = false }) {
   const [clock, setClock] = useState(() => parts(new Date(), lang));
 
   useEffect(() => {
@@ -26,17 +26,25 @@ export default function TimeInfoCard({ label = '지금 시간', lang = 'ko' }) {
     return () => clearInterval(id);
   }, [lang]);
 
+  if (compact) {
+    return (
+      <div className="text-[clamp(0.75rem,1.55vh,0.95rem)] font-semibold text-[var(--cw-accent,#7C3AED)]">
+        {label} {clock.dateLabel} {clock.hh}:{clock.mi}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex w-full items-center justify-center gap-[clamp(0.75rem,2vw,1.5rem)] rounded-[clamp(0.75rem,1.5vh,1.5rem)] bg-[var(--cw-panel,#ffffff)] px-[clamp(0.75rem,2vw,1.5rem)] py-[clamp(0.5rem,1.4vh,1rem)] shadow-[0_8px_30px_rgba(120,100,180,0.08)]">
-      <div className="shrink-0 whitespace-nowrap text-[clamp(0.7rem,1.5vh,0.95rem)] text-[var(--cw-text-muted,#9ca3af)]">
+    <div className="flex w-full items-center justify-center gap-[clamp(0.75rem,2vw,1.5rem)] rounded-[clamp(0.75rem,1.5vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.75rem,2vw,1.5rem)] py-[clamp(0.5rem,1.4vh,1rem)]">
+      <div className="shrink-0 whitespace-nowrap text-[clamp(0.7rem,1.5vh,0.95rem)] text-[var(--cw-text-muted,#9CA3AF)]">
         {label}{' '}
-        <span className="font-semibold text-[var(--cw-text,#374151)]">{clock.dateLabel}</span>
+        <span className="font-semibold text-[var(--cw-text,#fff)]">{clock.dateLabel}</span>
       </div>
       <div className="flex items-end gap-1 whitespace-nowrap">
-        <span className="text-[clamp(1.35rem,3.5vh,2.5rem)] font-extrabold tracking-tight text-[var(--cw-accent,#8b7cf6)]">
+        <span className="text-[clamp(1.35rem,3.5vh,2.5rem)] font-extrabold tracking-tight text-[var(--cw-accent,#A78BFA)]">
           {clock.hh}:{clock.mi}
         </span>
-        <span className="mb-0.5 text-[clamp(0.85rem,2vh,1.25rem)] font-bold text-[var(--cw-accent,#8b7cf6)]">
+        <span className="mb-0.5 text-[clamp(0.85rem,2vh,1.25rem)] font-bold text-[var(--cw-accent,#A78BFA)]">
           {clock.ss}
         </span>
       </div>

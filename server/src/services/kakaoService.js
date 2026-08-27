@@ -25,23 +25,20 @@ function toAbsoluteUrl(pathOrUrl) {
 }
 
 function buildCtx(facility, waiting, extra = {}) {
-  const completePath = waiting.complete_page_link || '';
-  const completeLink = toAbsoluteUrl(completePath);
-  const cancelLink = completePath ? toAbsoluteUrl(`${completePath}/cancel`) : completeLink;
-  const postponeLink = completePath
-    ? toAbsoluteUrl(`${completePath}/postpone`)
-    : completeLink;
-
   return {
     facilityName: facility.name,
-    dailySeq: waiting.daily_seq,
-    totalCount: waiting.total_count,
+    facilityCode: facility.facility_code || facility.facilityCode || '',
+    waitingId: waiting?.id || '',
+    dailySeq: waiting?.daily_seq ?? waiting?.dailySeq,
+    totalCount: waiting?.total_count ?? waiting?.totalCount,
     /** 현재 입장대기 순서(큐 순번) */
-    waitOrder: waiting.queue_order ?? waiting.queueOrder ?? waiting.daily_seq,
-    completeLink,
-    cancelLink,
-    postponeLink,
-    entryWaitMinutes: Math.max(1, Number(facility.entry_wait_minutes || 5)),
+    waitOrder: waiting?.queue_order ?? waiting?.queueOrder ?? waiting?.daily_seq,
+    entryWaitMinutes: Math.max(1, Number(facility.entry_wait_minutes || facility.entryWaitMinutes || 5)),
+    postponeLimit: Math.max(1, Number(facility.postpone_limit || facility.postponeLimit || 3)),
+    notificationOrder:
+      facility.waiting_notification_order ?? facility.waitingNotificationOrder ?? null,
+    cancelledAt: waiting?.cancelled_at || waiting?.cancelledAt || extra.cancelledAt || new Date(),
+    eventAt: extra.eventAt || new Date(),
     ...extra,
   };
 }
@@ -115,6 +112,12 @@ export const kakaoService = {
     const changeWord = buildChangeWord(templateKey, ctx);
     const refKey = `w_${String(waiting.id || '').replace(/-/g, '').slice(0, 24)}`;
     const useLive = isPpurioConfigured();
+
+    console.log('[kakao changeWord]', {
+      templateKey,
+      templateCode,
+      changeWord,
+    });
 
     const payload = {
       templateKey,
@@ -272,7 +275,7 @@ export const kakaoService = {
   },
 
   async sendWaitingRegistered({ facility, waiting }) {
-    const key = registrationTemplateKey(facility.postpone_policy || 'none');
+    const key = registrationTemplateKey();
     return this.dispatchTemplate({ facility, waiting, templateKey: key });
   },
 
@@ -289,7 +292,14 @@ export const kakaoService = {
       reason === 'no_show' || reason === 'timeout'
         ? TEMPLATE.TIMEOUT_CANCEL
         : TEMPLATE.CANCEL;
-    return this.dispatchTemplate({ facility, waiting, templateKey: key });
+    return this.dispatchTemplate({
+      facility,
+      waiting,
+      templateKey: key,
+      extraCtx: {
+        cancelledAt: waiting?.cancelled_at || waiting?.cancelledAt || new Date(),
+      },
+    });
   },
 
   async sendPostponeDone({ facility, waiting, newOrder }) {
@@ -297,7 +307,10 @@ export const kakaoService = {
       facility,
       waiting,
       templateKey: TEMPLATE.POSTPONE_DONE,
-      extraCtx: { newOrder },
+      extraCtx: {
+        newOrder,
+        postponeLimit: facility.postpone_limit || facility.postponeLimit,
+      },
     });
   },
 
@@ -306,7 +319,136 @@ export const kakaoService = {
       facility,
       waiting,
       templateKey: TEMPLATE.APPROACHING,
-      extraCtx: { remainingOrder, aheadCount },
+      extraCtx: {
+        remainingOrder,
+        notificationOrder: remainingOrder,
+        aheadCount,
+      },
+    });
+  },
+
+  /**
+   * 시설 관리자 + 시스템 관리자 연락처로 충전/환불 안내 발송 (잔액 차감 없음)
+   */
+  async sendAdminBalanceNotice({
+    facility,
+    templateKey,
+    amount,
+    balanceAfter,
+    eventAt = new Date(),
+  }) {
+    const { systemSettingsRepository } = await import(
+      '../repositories/systemSettingsRepository.js'
+    );
+    const templateName = templateDisplayName(templateKey);
+    const templateCode = getTemplateCode(templateKey);
+    if (!templateCode) {
+      return withReason({
+        ok: false,
+        reason: 'API_ERROR',
+        detail: `MISSING_TEMPLATE templateKey=${templateKey}`,
+      });
+    }
+
+    const systemContact = await systemSettingsRepository.getAdminContact();
+    const phones = [
+      facility.admin_contact || facility.adminContact,
+      systemContact,
+    ]
+      .map((p) => String(p || '').replace(/\D/g, ''))
+      .filter((p) => p.length >= 10);
+
+    const uniquePhones = [...new Set(phones)];
+    if (uniquePhones.length === 0) {
+      console.warn('[ppurio] no admin recipients for', templateKey);
+      return withReason({
+        ok: false,
+        reason: 'API_ERROR',
+        detail: 'NO_ADMIN_RECIPIENTS',
+        message: '시설/시스템 관리자 연락처가 없어 알림톡을 발송하지 못했습니다.',
+      });
+    }
+
+    const changeWord = buildChangeWord(templateKey, {
+      facilityName: facility.name,
+      amount,
+      balanceAfter,
+      eventAt,
+    });
+    const useLive = isPpurioConfigured();
+    const results = [];
+
+    for (const to of uniquePhones) {
+      const refKey = `a_${String(facility.id || '').replace(/-/g, '').slice(0, 12)}_${Date.now()
+        .toString()
+        .slice(-8)}`;
+      const payload = {
+        templateKey,
+        templateName,
+        templateCode,
+        to,
+        changeWord,
+        refKey,
+        live: useLive,
+        adminNotice: true,
+      };
+
+      let sendResult = { ok: true, mock: !useLive };
+      if (useLive) {
+        try {
+          sendResult = await sendAlimtalk({
+            to,
+            templateCode,
+            changeWord,
+            refKey,
+            isResend: 'N',
+          });
+        } catch (err) {
+          console.error('[ppurio] admin notice exception', err?.message || err);
+          sendResult = { ok: false, message: String(err?.message || err) };
+        }
+      } else {
+        console.log('[Kakao Alimtalk MOCK] admin notice', payload);
+      }
+
+      await query(
+        `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+         VALUES ($1, NULL, 'kakao', $2, $3)`,
+        [
+          facility.id,
+          JSON.stringify({ ...payload, ppurio: sendResult }),
+          sendResult.ok ? 'sent' : 'failed',
+        ]
+      );
+      results.push({ to, ok: !!sendResult.ok, sendResult });
+    }
+
+    const ok = results.some((r) => r.ok);
+    return withReason({
+      ok,
+      reason: useLive ? (ok ? 'SUCCESS' : 'API_ERROR') : 'MOCK',
+      mock: !useLive,
+      results,
+    });
+  },
+
+  async sendChargeNotice({ facility, amount, balanceAfter, eventAt }) {
+    return this.sendAdminBalanceNotice({
+      facility,
+      templateKey: TEMPLATE.CHARGE,
+      amount,
+      balanceAfter,
+      eventAt,
+    });
+  },
+
+  async sendRefundNotice({ facility, amount, balanceAfter, eventAt }) {
+    return this.sendAdminBalanceNotice({
+      facility,
+      templateKey: TEMPLATE.REFUND,
+      amount,
+      balanceAfter,
+      eventAt,
     });
   },
 

@@ -170,6 +170,17 @@ export async function sendAlimtalk({
     cleanedChangeWord[k] = String(v);
   }
 
+  console.log('[button urls]', {
+    confirm: cleanedChangeWord.var6,
+    postpone: cleanedChangeWord.var7,
+    cancel: cleanedChangeWord.var8,
+    lengths: {
+      confirm: cleanedChangeWord.var6?.length ?? null,
+      postpone: cleanedChangeWord.var7?.length ?? null,
+      cancel: cleanedChangeWord.var8?.length ?? null,
+    },
+  });
+
   const body = {
     account,
     messageType: 'ALT',

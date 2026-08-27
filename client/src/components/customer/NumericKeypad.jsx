@@ -4,10 +4,10 @@ const KEY_GLYPH =
   'inline-flex h-[min(100%,2.9rem)] min-h-[40px] min-w-[40px] items-center justify-center text-[clamp(1.2rem,3.2vh,2.1rem)] leading-none';
 
 const ICON_GLYPH =
-  'inline-flex h-[min(100%,2.9rem)] min-h-[40px] min-w-[40px] items-center justify-center text-[clamp(1.55rem,4.2vh,2.75rem)] leading-none text-[var(--cw-text-muted,#6b7280)]';
+  'inline-flex h-[min(100%,2.9rem)] min-h-[40px] min-w-[40px] items-center justify-center text-[clamp(1.2rem,3.2vh,2.1rem)] leading-none text-[var(--cw-text-muted,#9CA3AF)]';
 
-const BACK_GLYPH =
-  'inline-flex h-[min(100%,2.9rem)] min-h-[40px] min-w-[40px] items-center justify-center text-[clamp(1.2rem,3.2vh,2.1rem)] leading-none text-[var(--cw-text-muted,#6b7280)]';
+const KEY_BTN =
+  'flex min-h-[40px] items-center justify-center overflow-hidden rounded-[clamp(0.55rem,1.35vh,1.2rem)] border border-[var(--cw-border,rgba(255,255,255,0.06))] bg-[var(--cw-keypad-key,#1A1A24)] font-bold text-[var(--cw-text,#fff)] transition-[transform,filter,background-color] duration-125 ease-out hover:brightness-110 active:scale-[0.96] active:brightness-95';
 
 function RefreshIcon() {
   return (
@@ -17,7 +17,7 @@ function RefreshIcon() {
       height="1em"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth="1.9"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -28,6 +28,7 @@ function RefreshIcon() {
   );
 }
 
+/** 왼쪽 화살표(←) — 숫자 버튼과 시각적 균형 */
 function BackspaceIcon() {
   return (
     <svg
@@ -36,14 +37,13 @@ function BackspaceIcon() {
       height="1em"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth="2.1"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 5H5.5A2.5 2.5 0 0 0 3.2 6.4L1 12l2.2 5.6A2.5 2.5 0 0 0 5.5 19H12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z" />
-      <path d="m15.5 9.5 5 5" />
-      <path d="m20.5 9.5-5 5" />
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
     </svg>
   );
 }
@@ -52,18 +52,13 @@ export default function NumericKeypad({ onKey }) {
   return (
     <div className="grid h-full min-h-0 w-full grid-cols-3 grid-rows-4 gap-[clamp(0.25rem,0.8vh,0.65rem)]">
       {KEYS.map((key) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => onKey(key)}
-          className="flex min-h-[40px] items-center justify-center overflow-hidden rounded-[clamp(0.55rem,1.35vh,1.2rem)] bg-[var(--cw-keypad-key,#F4F2FC)] font-bold text-[var(--cw-text,#2d2d2d)] transition hover:brightness-110 active:scale-[0.98]"
-        >
+        <button key={key} type="button" onClick={() => onKey(key)} className={KEY_BTN}>
           {key === 'reset' ? (
             <span className={ICON_GLYPH} aria-label="새로고침">
               <RefreshIcon />
             </span>
           ) : key === 'back' ? (
-            <span className={BACK_GLYPH} aria-label="지우기">
+            <span className={ICON_GLYPH} aria-label="지우기">
               <BackspaceIcon />
             </span>
           ) : (

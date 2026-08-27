@@ -98,7 +98,12 @@ function mapWaiting(row, index = 0) {
     status: row.status,
     statusLabel: statusLabel(row.status),
     marketingAgreed: row.marketing_agreed,
+    marketingAgreedAt: row.marketing_agreed_at || null,
     termsAgreed: row.terms_agreed ?? row.marketing_agreed,
+    termsOfUseAgreed: row.terms_of_use_agreed ?? row.terms_agreed ?? false,
+    termsOfUseAgreedAt: row.terms_of_use_agreed_at || null,
+    privacyAgreed: row.privacy_agreed ?? row.terms_agreed ?? false,
+    privacyAgreedAt: row.privacy_agreed_at || null,
     registeredAt: row.registered_at,
     completedAt: row.completed_at,
     cancelledAt: row.cancelled_at,
@@ -147,16 +152,29 @@ export const waitingService = {
     ]);
 
     const mappedPending = pending.map((r, i) => mapWaiting(r, i));
-    const currentlyCalled = mappedPending
-      .filter((w) => w.calledAt)
-      .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
+    const mappedCompleted = completed.map((r, i) => mapWaiting(r, i));
+    const entryWaitMinutes = Math.max(1, Number(facility.entry_wait_minutes || 5));
+
+    // 호출 중(pending + calledAt) 우선, 없으면 최근 입장완료(입장하기) 팀을 표시
+    let currentlyCalled =
+      mappedPending
+        .filter((w) => w.calledAt)
+        .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
+
+    if (!currentlyCalled && mappedCompleted[0]?.completedAt) {
+      const ageMs =
+        Date.now() - new Date(mappedCompleted[0].completedAt).getTime();
+      if (ageMs <= entryWaitMinutes * 60 * 1000) {
+        currentlyCalled = mappedCompleted[0];
+      }
+    }
 
     return {
       counts,
-      entryWaitMinutes: Math.max(1, Number(facility.entry_wait_minutes || 5)),
+      entryWaitMinutes,
       currentlyCalled,
       pending: mappedPending,
-      completed: completed.map((r, i) => mapWaiting(r, i)),
+      completed: mappedCompleted,
       cancelled: cancelled.map((r, i) => mapWaiting(r, i)),
     };
   },
@@ -195,10 +213,15 @@ export const waitingService = {
     if (!isValidPhone(phone)) {
       throw createError(400, '올바른 휴대폰 번호를 입력해 주세요.');
     }
-    const termsAgreed = !!(payload.termsAgreed ?? payload.privacyAgreed);
-    if (!termsAgreed) {
+
+    // 하위 호환: termsAgreed 단일 플래그면 이용약관+개인정보 둘 다 동의로 매핑
+    const legacyTerms = payload.termsAgreed === true;
+    const termsOfUseAgreed = !!(payload.termsOfUseAgreed ?? legacyTerms);
+    const privacyAgreed = !!(payload.privacyAgreed ?? legacyTerms);
+    if (!termsOfUseAgreed || !privacyAgreed) {
       throw createError(400, '필수 약관에 동의해 주세요.');
     }
+    const marketingAgreed = !!payload.marketingAgreed;
 
     const partyCounts = payload.partyCounts || {};
     const totalCount = Object.values(partyCounts).reduce((sum, n) => sum + Number(n || 0), 0);
@@ -213,8 +236,9 @@ export const waitingService = {
       partyCounts,
       totalCount,
       termsAgreed: true,
-      // 마케팅 별도 동의 폐지 — 이력 컬럼은 유지하되 신규는 false
-      marketingAgreed: false,
+      termsOfUseAgreed: true,
+      privacyAgreed: true,
+      marketingAgreed,
       queueOrder,
       completePageLink: null,
     });
@@ -225,7 +249,7 @@ export const waitingService = {
     await customerRepository.upsert({
       facilityId: facility.id,
       phone,
-      marketingAgreed: false,
+      marketingAgreed,
       registeredAt: waiting.registered_at,
     });
 
@@ -260,11 +284,12 @@ export const waitingService = {
         name: facility.name,
         profileImageUrl: facility.profile_image_url,
         facilityCode: facility.facility_code,
-        brandDisplayMode:
-          facility.brand_display_mode === 'image' ? 'image' : 'image_text',
+        brandDisplayMode: 'image_text',
         theme: facility.theme === 'dark' ? 'dark' : 'light',
         postponePolicy,
         postponeLimit,
+        storeNotice: facility.store_notice || '',
+        adAreaEnabled: facility.ad_area_enabled !== false,
       },
       waiting: {
         ...mapWaiting(waiting, Math.max((position || 1) - 1, 0)),

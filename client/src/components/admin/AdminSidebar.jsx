@@ -1,14 +1,35 @@
 import { NavLink } from 'react-router-dom';
 
+function SidebarBrand() {
+  return (
+    <div className="sidebar-logo" aria-label="T BRIDGE">
+      <span className="sidebar-logo-mark">T</span>
+      <span className="sidebar-logo-text">BRIDGE</span>
+    </div>
+  );
+}
+
+function SidebarToggle({ onClick, title, expand }) {
+  return (
+    <button
+      type="button"
+      className="sidebar-toggle"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+    >
+      {expand ? '»»' : '···'}
+    </button>
+  );
+}
+
 export default function AdminSidebar({ facilityCode, onLogout, collapsed, onToggle }) {
   const base = `/admin/${facilityCode}`;
 
   if (collapsed) {
     return (
       <aside className="admin-sidebar collapsed">
-        <button type="button" className="sidebar-toggle" onClick={onToggle} title="메뉴 열기">
-          »»
-        </button>
+        <SidebarToggle onClick={onToggle} title="메뉴 열기" expand />
       </aside>
     );
   }
@@ -16,12 +37,8 @@ export default function AdminSidebar({ facilityCode, onLogout, collapsed, onTogg
   return (
     <aside className="admin-sidebar">
       <div className="sidebar-top">
-        <div className="sidebar-logo">
-          <img src="/tbridge_logo.png" alt="T BRIDGE" />
-        </div>
-        <button type="button" className="sidebar-toggle" onClick={onToggle} title="메뉴 닫기">
-          ««
-        </button>
+        <SidebarBrand />
+        <SidebarToggle onClick={onToggle} title="메뉴 닫기" />
       </div>
       <nav>
         <NavLink to={`${base}/waiting`} className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -35,6 +52,9 @@ export default function AdminSidebar({ facilityCode, onLogout, collapsed, onTogg
         </NavLink>
         <NavLink to={`${base}/billing`} className={({ isActive }) => (isActive ? 'active' : '')}>
           알림톡
+        </NavLink>
+        <NavLink to={`${base}/notices`} className={({ isActive }) => (isActive ? 'active' : '')}>
+          공지사항
         </NavLink>
         <NavLink to={`${base}/settings`} className={({ isActive }) => (isActive ? 'active' : '')}>
           설정

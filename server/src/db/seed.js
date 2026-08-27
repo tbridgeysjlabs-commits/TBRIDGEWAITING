@@ -182,20 +182,29 @@ async function seed() {
     );
   }
 
-  await query(
-    `INSERT INTO kakao_templates (
-       facility_id, template_code, template_name, content, sender_key
-     ) VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (facility_id, template_code) DO UPDATE
-       SET content = EXCLUDED.content, sender_key = EXCLUDED.sender_key`,
-    [
-      facilityId,
-      'WAITING_REGISTERED',
-      '웨이팅 등록 완료',
-      '[{facility_name}] {daily_seq}번 웨이팅이 등록되었습니다. 인원: {total_count}명',
-      'SENDER_DEMO_KEY',
-    ]
-  );
+  await query(`DELETE FROM kakao_templates WHERE facility_id = $1`, [facilityId]);
+  const templates = [
+    ['ppur_2026081911072324417655171', '웨이팅 등록 완료 안내'],
+    ['ppur_2026081911054024417231502', '입장 임박 안내'],
+    ['ppur_2026081911043647407558286', '입장 안내'],
+    ['ppur_2026081911024547407465933', '미입장 웨이팅 취소 안내'],
+    ['ppur_2026081911012247407706584', '웨이팅 순서 변경 완료 안내'],
+    ['ppur_2026081910595547407136242', '웨이팅 취소 완료 안내'],
+    ['ppur_2026081812234847407727731', '티브리지 웨이팅 환불 안내'],
+    ['ppur_2026081812114047407778284', '티브리지 웨이팅 충전 안내'],
+  ];
+  for (const [code, name] of templates) {
+    await query(
+      `INSERT INTO kakao_templates (
+         facility_id, template_code, template_name, content, sender_key
+       ) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (facility_id, template_code) DO UPDATE
+         SET template_name = EXCLUDED.template_name,
+             content = EXCLUDED.content,
+             sender_key = EXCLUDED.sender_key`,
+      [facilityId, code, name, name, 'SENDER_DEMO_KEY']
+    );
+  }
 
   await query(
     `INSERT INTO api_credentials (facility_id, api_key, is_active)

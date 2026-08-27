@@ -22,7 +22,6 @@ function displayPhone(digits) {
     return `${prefix}-${rest.slice(0, 3)}-${rest.slice(3)}`;
   }
 
-  // 입력 중: 010 계열은 4-4, 그 외는 3-4 쪽으로 점진 표시
   if (prefix === '010') {
     if (rest.length <= 4) return `${prefix}-${rest}`;
     return `${prefix}-${rest.slice(0, 4)}-${rest.slice(4)}`;
@@ -56,13 +55,13 @@ export default function HomePage() {
 
   return (
     <div
-      className={`${homePanelClass || DEFAULT_PANEL} rounded-[clamp(1.5rem,3vh,3.375rem)] border border-[var(--cw-panel-border,#e9e5f5)] bg-[var(--cw-panel,#ffffff)] shadow-[0_24px_60px_rgba(120,100,180,0.12)]`}
+      className={`${homePanelClass || DEFAULT_PANEL} !pt-[40px] rounded-[clamp(1.5rem,3vh,3.375rem)] border border-[var(--cw-panel-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] shadow-[0_24px_60px_rgba(0,0,0,0.35)]`}
     >
       <div className="w-full shrink-0 py-[clamp(0.35rem,1.1vh,0.95rem)]">
-        <div className="w-full text-center text-[clamp(1.65rem,4.6vh,3.55rem)] font-extrabold leading-tight tracking-wide text-[var(--cw-text,#3a3550)]">
+        <div className="w-full text-center text-[clamp(1.65rem,4.6vh,3.55rem)] font-extrabold leading-tight tracking-wide text-[var(--cw-text,#fff)]">
           {displayPhone(digits) || '\u00A0'}
         </div>
-        <p className="mt-[clamp(0.3rem,1vh,0.9rem)] w-full text-center text-[clamp(0.8rem,1.95vh,1.35rem)] text-[var(--cw-text-muted,#9ca3af)]">
+        <p className="mt-[clamp(0.3rem,1vh,0.9rem)] w-full text-center text-[clamp(0.8rem,1.95vh,1.35rem)] text-[var(--cw-text-muted,#9CA3AF)]">
           {t('phone_hint')}
         </p>
       </div>
@@ -72,7 +71,7 @@ export default function HomePage() {
       </div>
 
       <PrimaryButton
-        className="w-full shrink-0 rounded-2xl bg-[var(--cw-button-bg,#5B21B6)] py-[clamp(0.65rem,1.8vh,1.25rem)] text-[clamp(0.9rem,2vh,1.25rem)] text-[var(--cw-button-fg,#fff)] shadow-[0_8px_20px_rgba(91,33,182,0.35)]"
+        className="w-full shrink-0 py-[clamp(0.65rem,1.8vh,1.25rem)] text-[clamp(0.9rem,2vh,1.25rem)]"
         disabled={!valid}
         onClick={() => navigate(`/w/${facilityCode}/party`)}
       >

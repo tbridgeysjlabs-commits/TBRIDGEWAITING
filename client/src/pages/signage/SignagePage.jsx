@@ -158,8 +158,7 @@ export default function SignagePage() {
   const isCalling = Boolean(activeCall);
   const name = facility.name || '{ 시설사명 }';
   const logoUrl = facility.profileImageUrl;
-  const brandMode =
-    facility.brandDisplayMode === 'image' ? 'image' : 'image_text';
+  const brandMode = 'image_text';
 
   return (
     <div className={styles.viewport}>
@@ -169,29 +168,19 @@ export default function SignagePage() {
       >
         <header className={styles.header}>
           <div className={styles.brand} data-brand-mode={brandMode}>
-            {brandMode === 'image' ? (
-              <div className={styles.brandImageOnly}>
+            <>
+              <div className={styles.logo}>
                 {logoUrl ? (
-                  <img className={styles.logoImg} src={logoUrl} alt={name} />
+                  <img className={styles.logoImg} src={logoUrl} alt="" />
                 ) : (
-                  <span className={styles.logoFallback}>image</span>
+                  <span className={styles.logoFallback}>LOGO</span>
                 )}
               </div>
-            ) : (
-              <>
-                <div className={styles.logo}>
-                  {logoUrl ? (
-                    <img className={styles.logoImg} src={logoUrl} alt="" />
-                  ) : (
-                    <span className={styles.logoFallback}>LOGO</span>
-                  )}
-                </div>
-                <div className={styles.brandText}>
-                  <span className={styles.facilityLabel}>FACILITY</span>
-                  <span className={styles.facilityName}>{name}</span>
-                </div>
-              </>
-            )}
+              <div className={styles.brandText}>
+                <span className={styles.facilityLabel}>FACILITY</span>
+                <span className={styles.facilityName}>{name}</span>
+              </div>
+            </>
           </div>
           <div className={styles.clock}>
             <span className={styles.clockDate}>{clock.date}</span>
@@ -216,8 +205,7 @@ export default function SignagePage() {
                     <span className={styles.numValue}>{activeCall.dailySeq}</span>
                   </div>
                   <div className={styles.callCopy}>
-                    <p className={styles.callTeam}>번 팀</p>
-                    <p className={styles.callPlease}>입장해 주세요</p>
+                    <p className={styles.callTeam}>번 팀 입장해 주세요</p>
                     <div className={styles.callPills}>
                       <span className={styles.pill}>
                         {peopleLabel(activeCall.totalCount)}

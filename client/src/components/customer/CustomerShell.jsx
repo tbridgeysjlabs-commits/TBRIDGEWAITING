@@ -6,7 +6,6 @@ import { useWaitingFlow } from '../../context/WaitingFlowContext';
 import { useFullscreenToggle } from '../../hooks/useFullscreenToggle';
 import { themeStyle } from '../../theme/customerTheme';
 import LanguagePillSelector from './LanguagePillSelector';
-import WaitingStatusRing from './WaitingStatusRing';
 import TimeInfoCard from './TimeInfoCard';
 import TBridgeLogo from './TBridgeLogo';
 
@@ -15,38 +14,78 @@ const PANEL =
   'flex h-full w-full max-w-[min(690px,100%)] flex-col justify-between px-[clamp(1rem,2.8vw,2.75rem)] py-[clamp(0.75rem,2.2vh,2.25rem)]';
 
 function FacilityBrand({ facility }) {
-  const mode = facility.brandDisplayMode === 'image' ? 'image' : 'image_text';
   const img = facility.profileImageUrl;
-
-  if (mode === 'image') {
-    // 큰 이미지(2.3:1) — 원형 아님, 작은 border-radius
-    return (
-      <div className="flex w-full shrink-0 items-center justify-center">
-        <div className="w-full max-w-[min(100%,420px)] overflow-hidden rounded-[4px] bg-[var(--cw-panel-alt,#f3f3f3)] aspect-[2.3/1]">
-          {img ? (
-            <img src={img} alt={facility.name || ''} className="h-full w-full object-cover" />
-          ) : (
-            <div className="grid h-full w-full place-items-center text-xs text-[var(--cw-text-muted,#9ca3af)]">
-              logo
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex w-full shrink-0 items-center justify-center gap-[clamp(0.5rem,1.2vw,1rem)]">
-      <div className="flex aspect-square h-[clamp(2.5rem,5.5vh,4.5rem)] w-[clamp(2.5rem,5.5vh,4.5rem)] shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--cw-panel-alt,#f3f3f3)] text-xs text-[var(--cw-text-muted,#9ca3af)]">
+    <div className="flex w-full shrink-0 items-center gap-[clamp(0.75rem,1.5vw,1.25rem)] rounded-[clamp(0.9rem,1.8vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.9rem,2vw,1.5rem)] py-[clamp(0.7rem,1.6vh,1.15rem)]">
+      <div className="flex aspect-square h-[clamp(3rem,6vh,4.5rem)] w-[clamp(3rem,6vh,4.5rem)] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--cw-panel-alt,#f3f3f3)] text-xs text-[var(--cw-text-muted,#9ca3af)]">
         {img ? (
           <img src={img} alt="" className="h-full w-full object-cover" />
         ) : (
           'logo'
         )}
       </div>
-      <div className="truncate text-[clamp(1.25rem,3.2vh,2.5rem)] font-extrabold leading-tight text-[var(--cw-text,#1f1a33)]">
+      <div className="min-w-0 truncate text-[clamp(1.35rem,3.2vh,2.25rem)] font-extrabold leading-tight text-[var(--cw-text,#1f1a33)]">
         {facility.name}
       </div>
+    </div>
+  );
+}
+
+function WaitingStatsCard({ facility, t, lang }) {
+  const pending = Math.max(0, Number(facility.pendingCount) || 0);
+  const perTeam = Math.max(1, Number(facility.avgWaitMinutesPerTeam) || 5);
+  const estimated = pending * perTeam;
+
+  return (
+    <div className="w-full shrink-0 rounded-[clamp(0.9rem,1.8vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.9rem,2vw,1.5rem)] py-[clamp(0.75rem,1.8vh,1.25rem)]">
+      <div className="mb-[clamp(0.55rem,1.4vh,1rem)]">
+        <TimeInfoCard label={t('now_time')} lang={lang} compact />
+      </div>
+      <div className="grid grid-cols-2 gap-[clamp(0.75rem,2vw,1.5rem)]">
+        <div>
+          <div className="mb-1 text-[clamp(0.75rem,1.6vh,1rem)] text-[var(--cw-text-muted,#9CA3AF)]">
+            {t('current_waiting')}
+          </div>
+          <div className="flex items-end gap-1 leading-none">
+            <strong className="text-[clamp(2rem,5.5vh,3.5rem)] font-extrabold tracking-tight text-[var(--cw-text,#1f1a33)]">
+              {pending}
+            </strong>
+            <span className="mb-1 text-[clamp(0.9rem,2vh,1.25rem)] font-bold text-[var(--cw-text,#1f1a33)]">
+              {t('teams')}
+            </span>
+          </div>
+        </div>
+        <div>
+          <div className="mb-1 text-[clamp(0.75rem,1.6vh,1rem)] text-[var(--cw-text-muted,#9CA3AF)]">
+            {t('estimated_wait') || '예상 대기시간'}
+          </div>
+          <div className="flex items-end gap-1 leading-none">
+            <strong className="text-[clamp(2rem,5.5vh,3.5rem)] font-extrabold tracking-tight text-[var(--cw-accent,#7C3AED)]">
+              {estimated}
+            </strong>
+            <span className="mb-1 text-[clamp(0.9rem,2vh,1.25rem)] font-bold text-[var(--cw-accent,#7C3AED)]">
+              {t('minutes') || '분'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KioskNoticeCard({ html, title }) {
+  const content = String(html || '').trim();
+  if (!content) return null;
+  return (
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[clamp(0.9rem,1.8vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.9rem,2vw,1.5rem)] py-[clamp(0.75rem,1.8vh,1.25rem)]">
+      <h3 className="shrink-0 text-[clamp(0.95rem,2vh,1.2rem)] font-bold text-[var(--cw-text,#1f1a33)]">
+        {title}
+      </h3>
+      <div className="my-2 h-px w-full shrink-0 bg-[var(--cw-border,rgba(0,0,0,0.08))]" />
+      <div
+        className="min-h-0 flex-1 overflow-y-auto text-[clamp(0.8rem,1.7vh,1rem)] leading-relaxed text-[var(--cw-text,#1f1a33)] opacity-90 [&_li]:mb-1 [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
     </div>
   );
 }
@@ -72,6 +111,15 @@ export default function CustomerShell() {
     loadFacility().catch((e) => setError(e.message));
   }, [facilityCode, lang]);
 
+  // 홈: 대기팀 수 실시간 반영
+  useEffect(() => {
+    if (!isHome) return undefined;
+    const id = setInterval(() => {
+      loadFacility().catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [isHome, facilityCode, lang]);
+
   const extraLangs = useMemo(
     () => (facility?.enabledLanguages || []).filter((l) => l !== 'ko'),
     [facility]
@@ -82,14 +130,14 @@ export default function CustomerShell() {
 
   if (error) {
     return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#f7f5ff] text-gray-500">
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#f7f7fa] text-gray-500">
         {error}
       </div>
     );
   }
   if (!facility) {
     return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#f7f5ff] text-gray-400">
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#f7f7fa] text-gray-400">
         Loading...
       </div>
     );
@@ -104,7 +152,7 @@ export default function CustomerShell() {
   };
 
   const shellBg =
-    'h-dvh min-w-[768px] overflow-hidden font-[\'Pretendard\',\'Noto_Sans_KR\',sans-serif]';
+    "h-dvh min-w-[768px] overflow-hidden font-['Pretendard','Noto_Sans_KR',sans-serif]";
 
   if (!isHome) {
     return (
@@ -132,45 +180,32 @@ export default function CustomerShell() {
     >
       <div className="flex h-full w-full">
         <aside className="flex h-full w-1/2 min-w-0 justify-center px-[clamp(0.75rem,2vw,1.5rem)] py-[clamp(0.75rem,2vh,1.25rem)]">
-          <div className={PANEL}>
-            {/* 다국어 없으면 언어 영역 숨기고 그 자리에 시설사 표시 */}
-            <div className="flex w-full shrink-0 justify-center">
-              {showLangSelector ? (
-                <LanguagePillSelector
-                  lang={lang}
-                  onChange={setLang}
-                  enabled={['ko', ...extraLangs]}
-                />
-              ) : (
-                <FacilityBrand facility={facility} />
-              )}
-            </div>
-
-            {showLangSelector && <FacilityBrand facility={facility} />}
-
-            <div className="flex w-full shrink-0 items-center justify-center">
-              <WaitingStatusRing
-                label={t('current_waiting')}
-                count={facility.pendingCount}
-                unit={t('teams')}
-              />
-            </div>
-
-            <div className="w-full shrink-0">
-              <TimeInfoCard label={t('now_time')} lang={lang} />
-            </div>
-
-            <div className="flex w-full shrink-0 flex-col items-center gap-1">
+          <div className={`${PANEL} gap-[clamp(0.65rem,1.6vh,1.15rem)]`}>
+            <div className="flex w-full shrink-0 items-center gap-[clamp(0.5rem,1.2vw,1rem)]">
               <TBridgeLogo
-                className="h-[clamp(1.5rem,3vh,2.5rem)] w-auto"
+                className="h-[clamp(1.35rem,2.8vh,2.1rem)] w-auto shrink-0"
                 enableFullscreenTap
                 onPointerUp={onLogoPointerUp}
                 onClick={onLogoClick}
               />
-              <div className="text-[clamp(0.7rem,1.4vh,0.875rem)] text-[var(--cw-text-muted,#9ca3af)]">
-                {facility.systemVersion}
-              </div>
+              {showLangSelector ? (
+                <div className="min-w-0 flex-1">
+                  <LanguagePillSelector
+                    lang={lang}
+                    onChange={setLang}
+                    enabled={['ko', ...extraLangs]}
+                    align="start"
+                  />
+                </div>
+              ) : null}
             </div>
+
+            <FacilityBrand facility={facility} />
+            <WaitingStatsCard facility={facility} t={t} lang={lang} />
+            <KioskNoticeCard
+              html={facility.kioskNotice}
+              title={t('notice') || '공지사항'}
+            />
           </div>
         </aside>
 

@@ -20,6 +20,9 @@ import FacilitiesPage from './pages/system/FacilitiesPage';
 import SystemHistoryPage from './pages/system/SystemHistoryPage';
 import SystemCustomersPage from './pages/system/SystemCustomersPage';
 import SystemBillingPage from './pages/system/SystemBillingPage';
+import SystemNoticesPage from './pages/system/SystemNoticesPage';
+import SystemSettingsPage from './pages/system/SystemSettingsPage';
+import NoticesPage from './pages/admin/NoticesPage';
 import SignagePage from './pages/signage/SignagePage';
 
 export default function App() {
@@ -62,13 +65,16 @@ export default function App() {
         path="/admin/:facilityCode/billing/result"
         element={<BillingResultPage />}
       />
+      <Route path="/admin/:facilityCode/notices" element={<NoticesPage />} />
       <Route path="/admin/:facilityCode/settings" element={<SettingsPage />} />
 
       <Route path="/system-admin/login" element={<SystemLoginPage />} />
       <Route path="/system-admin/facilities" element={<FacilitiesPage />} />
+      <Route path="/system-admin/notices" element={<SystemNoticesPage />} />
       <Route path="/system-admin/history" element={<SystemHistoryPage />} />
       <Route path="/system-admin/customers" element={<SystemCustomersPage />} />
       <Route path="/system-admin/billing" element={<SystemBillingPage />} />
+      <Route path="/system-admin/settings" element={<SystemSettingsPage />} />
 
       <Route path="*" element={<div className="center-page">페이지를 찾을 수 없습니다.</div>} />
     </Routes>

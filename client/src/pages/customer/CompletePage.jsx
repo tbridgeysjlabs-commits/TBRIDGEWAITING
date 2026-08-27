@@ -8,6 +8,7 @@ import CompleteFacilityInfo from '../../components/customer/complete/CompleteFac
 import CompleteWaitingStatus from '../../components/customer/complete/CompleteWaitingStatus';
 import CompleteActionButtons from '../../components/customer/complete/CompleteActionButtons';
 import CompleteAdArea from '../../components/customer/complete/CompleteAdArea';
+import CompleteStoreNotice from '../../components/customer/complete/CompleteStoreNotice';
 import { themeStyle } from '../../theme/customerTheme';
 
 function formatRegisteredAt(iso) {
@@ -129,7 +130,6 @@ export default function CompletePage() {
         <CompleteFacilityInfo
           name={facility.name}
           imageUrl={facility.profileImageUrl}
-          brandDisplayMode={facility.brandDisplayMode}
           registeredLabel={formatRegisteredAt(waiting.registeredAt)}
         />
 
@@ -152,7 +152,16 @@ export default function CompletePage() {
           )}
         </CompleteWaitingStatus>
 
-        <CompleteAdArea />
+        <CompleteStoreNotice text={facility.storeNotice} />
+        <CompleteAdArea visible={facility.adAreaEnabled !== false} />
+
+        <div className="mt-auto flex justify-center pb-2 pt-8">
+          <img
+            src="/tbridge_logo.png"
+            alt="T BRIDGE"
+            className="h-auto w-[min(140px,40vw)] opacity-90"
+          />
+        </div>
       </div>
 
       {lastModal && (

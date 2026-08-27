@@ -5,7 +5,10 @@ const fallback = {
   ko: {
     current_waiting: '현재 대기',
     teams: '팀',
-    now_time: '지금 시간',
+    estimated_wait: '예상 대기시간',
+    minutes: '분',
+    notice: '공지사항',
+    now_time: '현재 시간',
     phone_hint: '실시간 웨이팅 안내를 받을 수 있는 번호를 입력해 주세요',
     start_waiting: '웨이팅 시작',
     party_title: '총 입장 인원을 입력해 주세요',
@@ -40,6 +43,9 @@ const fallback = {
   en: {
     current_waiting: 'Waiting',
     teams: 'parties',
+    estimated_wait: 'Est. wait',
+    minutes: 'min',
+    notice: 'Notice',
     now_time: 'Current time',
     phone_hint: 'Enter a number to receive real-time waiting updates',
     start_waiting: 'Start waiting',
@@ -75,6 +81,9 @@ const fallback = {
   ja: {
     current_waiting: '現在の待ち',
     teams: '組',
+    estimated_wait: '予想待ち時間',
+    minutes: '分',
+    notice: 'お知らせ',
     now_time: '現在時刻',
     phone_hint: 'リアルタイム案内を受け取る番号を入力してください',
     start_waiting: 'ウェイティング開始',
@@ -110,6 +119,9 @@ const fallback = {
   zh: {
     current_waiting: '当前等候',
     teams: '组',
+    estimated_wait: '预计等候时间',
+    minutes: '分',
+    notice: '公告',
     now_time: '现在时间',
     phone_hint: '请输入可接收实时等候通知的手机号',
     start_waiting: '开始排队',

@@ -1,4 +1,5 @@
 import { formatDateTime } from '../../api/client';
+import AdminCloseIcon from '../admin/AdminCloseIcon';
 
 function formatAuthDate(value) {
   if (!value) return '-';
@@ -36,8 +37,8 @@ export default function PaymentReceiptModal({ item, onClose }) {
         style={{ maxWidth: 520 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="close-btn abs" onClick={onClose}>
-          X
+        <button type="button" className="close-btn abs" onClick={onClose} aria-label="닫기">
+          <AdminCloseIcon />
         </button>
         <h2>결제확인증</h2>
         <p style={{ marginTop: 0, color: '#6b7280', fontSize: 14 }}>

@@ -6,7 +6,7 @@
 export default function CustomerStepLayout({ header, children, footer, className = '' }) {
   return (
     <div
-      className={`mx-auto flex h-dvh max-h-dvh w-full max-w-[960px] flex-col overflow-hidden px-[clamp(1.25rem,3vw,3rem)] py-[clamp(0.6rem,1.8vh,1.25rem)] ${className}`}
+      className={`mx-auto flex h-dvh max-h-dvh w-full max-w-none flex-col overflow-hidden px-[clamp(1.25rem,3vw,3rem)] py-[clamp(0.6rem,1.8vh,1.25rem)] ${className}`}
     >
       <div className="shrink-0 overflow-hidden">{header}</div>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">

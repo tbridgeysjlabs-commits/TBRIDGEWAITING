@@ -4,6 +4,8 @@ import { facilityController, uploadFacilityImage } from '../controllers/facility
 import { waitingController } from '../controllers/waitingController.js';
 import { i18nController } from '../controllers/i18nController.js';
 import { customerController } from '../controllers/customerController.js';
+import { noticeController } from '../controllers/noticeController.js';
+import { systemSettingsController } from '../controllers/systemSettingsController.js';
 import { requireAuth, requireFacilityMatch } from '../middleware/auth.js';
 
 const router = Router();
@@ -15,6 +17,17 @@ router.get('/i18n/:lang', i18nController.getTranslations);
 // auth
 router.post('/system-admin/login', authController.loginSystem);
 router.post('/admin/:facilityCode/login', authController.loginFacility);
+router.put(
+  '/system-admin/password',
+  requireAuth(['system_admin']),
+  authController.changeSystemPassword
+);
+router.put(
+  '/admin/:facilityCode/password',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  authController.changeFacilityPassword
+);
 
 // public facility / customer
 router.get('/facilities/:facilityCode/public', facilityController.getPublic);
@@ -152,6 +165,12 @@ router.get(
   requireFacilityMatch(),
   facilityController.listCharges
 );
+router.get(
+  '/admin/:facilityCode/notices',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  noticeController.list
+);
 
 // system admin
 router.get(
@@ -163,6 +182,11 @@ router.post(
   '/system-admin/facilities',
   requireAuth(['system_admin']),
   facilityController.create
+);
+router.put(
+  '/system-admin/facilities/:facilityCode',
+  requireAuth(['system_admin']),
+  facilityController.update
 );
 router.get(
   '/system-admin/history',
@@ -193,6 +217,41 @@ router.post(
   '/system-admin/billing/charges/:id/cancel',
   requireAuth(['system_admin']),
   facilityController.cancelCharge
+);
+router.get(
+  '/system-admin/notices',
+  requireAuth(['system_admin']),
+  noticeController.list
+);
+router.post(
+  '/system-admin/notices',
+  requireAuth(['system_admin']),
+  noticeController.create
+);
+router.get(
+  '/system-admin/notices/:id',
+  requireAuth(['system_admin']),
+  noticeController.get
+);
+router.put(
+  '/system-admin/notices/:id',
+  requireAuth(['system_admin']),
+  noticeController.update
+);
+router.delete(
+  '/system-admin/notices/:id',
+  requireAuth(['system_admin']),
+  noticeController.remove
+);
+router.get(
+  '/system-admin/settings',
+  requireAuth(['system_admin']),
+  systemSettingsController.get
+);
+router.put(
+  '/system-admin/settings',
+  requireAuth(['system_admin']),
+  systemSettingsController.update
 );
 
 export default router;

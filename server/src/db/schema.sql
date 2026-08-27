@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS system_admins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  failed_login_count INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -19,6 +21,8 @@ CREATE TABLE IF NOT EXISTS facilities (
   kakao_balance NUMERIC(12,2) NOT NULL DEFAULT 10000,
   kakao_unit_cost NUMERIC(12,2) NOT NULL DEFAULT 20,
   kakao_warning_threshold NUMERIC(12,2) NOT NULL DEFAULT 1000,
+  failed_login_count INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
   status VARCHAR(20) NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'inactive', 'withdraw')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -49,6 +53,13 @@ CREATE TABLE IF NOT EXISTS facility_settings (
   theme VARCHAR(20) NOT NULL DEFAULT 'light',
   entry_wait_minutes INT NOT NULL DEFAULT 5,
   waiting_notification_order INT,
+  store_notice TEXT NOT NULL DEFAULT '',
+  ad_area_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  avg_wait_minutes_per_team INT NOT NULL DEFAULT 5,
+  kiosk_notice TEXT NOT NULL DEFAULT '',
+  kiosk_notice_en TEXT NOT NULL DEFAULT '',
+  kiosk_notice_ja TEXT NOT NULL DEFAULT '',
+  kiosk_notice_zh TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -77,7 +88,12 @@ CREATE TABLE IF NOT EXISTS waitings (
   status VARCHAR(20) NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'completed', 'cancelled', 'no_show', 'admin_cancelled')),
   marketing_agreed BOOLEAN NOT NULL DEFAULT FALSE,
+  marketing_agreed_at TIMESTAMPTZ,
   terms_agreed BOOLEAN NOT NULL DEFAULT FALSE,
+  terms_of_use_agreed BOOLEAN NOT NULL DEFAULT FALSE,
+  terms_of_use_agreed_at TIMESTAMPTZ,
+  privacy_agreed BOOLEAN NOT NULL DEFAULT FALSE,
+  privacy_agreed_at TIMESTAMPTZ,
   registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
@@ -212,3 +228,24 @@ CREATE TABLE IF NOT EXISTS notification_logs (
   status VARCHAR(20) NOT NULL DEFAULT 'sent',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS notices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version VARCHAR(40) NOT NULL DEFAULT '',
+  title VARCHAR(300) NOT NULL,
+  content_html TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notices_created ON notices(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO system_settings (key, value)
+VALUES ('admin_contact', '')
+ON CONFLICT (key) DO NOTHING;

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
+import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import AdminSidebar from '../../components/admin/AdminSidebar';
+import HtmlEditor from '../../components/HtmlEditor';
+import PasswordChecklist from '../../components/PasswordChecklist';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import { validatePassword } from '../../utils/passwordPolicy';
 
 const TOGGLE_LANGS = [
   { code: 'en', label: '영어', key: 'En' },
@@ -35,10 +39,17 @@ export default function SettingsPage() {
   const [form, setForm] = useState(null);
   const [types, setTypes] = useState([]);
   const [enabledLangs, setEnabledLangs] = useState(['ko']);
+  const [kakaoAlimtalkMode, setKakaoAlimtalkMode] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
   const [toast, setToast] = useState('');
   const [dragIndex, setDragIndex] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [pwSaving, setPwSaving] = useState(false);
   const dirtyRef = useRef(false);
   const saveRef = useRef(async () => {});
 
@@ -82,8 +93,26 @@ export default function SettingsPage() {
           termsEn: form.termsEn,
           termsJa: form.termsJa,
           termsZh: form.termsZh,
+          privacyKo: form.privacyKo || '',
+          privacyEn: form.privacyEn || '',
+          privacyJa: form.privacyJa || '',
+          privacyZh: form.privacyZh || '',
+          marketingKo: form.marketingKo || '',
+          marketingEn: form.marketingEn || '',
+          marketingJa: form.marketingJa || '',
+          marketingZh: form.marketingZh || '',
           kakaoWarningThreshold: Number(form.kakaoWarningThreshold) || 0,
           entryWaitMinutes: Math.max(1, Number(form.entryWaitMinutes) || 5),
+          avgWaitMinutesPerTeam: Math.max(
+            1,
+            Number(form.avgWaitMinutesPerTeam) || 5
+          ),
+          storeNotice: form.storeNotice || '',
+          adAreaEnabled: !!form.adAreaEnabled,
+          kioskNoticeKo: form.kioskNoticeKo || '',
+          kioskNoticeEn: form.kioskNoticeEn || '',
+          kioskNoticeJa: form.kioskNoticeJa || '',
+          kioskNoticeZh: form.kioskNoticeZh || '',
           waitingNotificationOrder:
             form.waitingNotificationOrder === '' ||
             form.waitingNotificationOrder == null
@@ -95,7 +124,7 @@ export default function SettingsPage() {
                   }
                   return n;
                 })(),
-          brandDisplayMode: form.brandDisplayMode,
+          brandDisplayMode: 'image_text',
           theme: form.theme,
         }),
       });
@@ -161,8 +190,28 @@ export default function SettingsPage() {
           updated.waitingNotificationOrder == null
             ? ''
             : updated.waitingNotificationOrder,
-        brandDisplayMode: updated.brandDisplayMode || form.brandDisplayMode,
+        brandDisplayMode: 'image_text',
         theme: updated.theme || form.theme,
+        storeNotice: updated.storeNotice ?? form.storeNotice ?? '',
+        adAreaEnabled: updated.adAreaEnabled !== false,
+        avgWaitMinutesPerTeam:
+          updated.avgWaitMinutesPerTeam ?? form.avgWaitMinutesPerTeam ?? 5,
+        kioskNoticeKo: updated.kioskNoticeKo ?? form.kioskNoticeKo ?? '',
+        kioskNoticeEn: updated.kioskNoticeEn ?? form.kioskNoticeEn ?? '',
+        kioskNoticeJa: updated.kioskNoticeJa ?? form.kioskNoticeJa ?? '',
+        kioskNoticeZh: updated.kioskNoticeZh ?? form.kioskNoticeZh ?? '',
+        termsKo: updated.termsKo ?? form.termsKo ?? '',
+        termsEn: updated.termsEn ?? form.termsEn ?? '',
+        termsJa: updated.termsJa ?? form.termsJa ?? '',
+        termsZh: updated.termsZh ?? form.termsZh ?? '',
+        privacyKo: updated.privacyKo ?? form.privacyKo ?? '',
+        privacyEn: updated.privacyEn ?? form.privacyEn ?? '',
+        privacyJa: updated.privacyJa ?? form.privacyJa ?? '',
+        privacyZh: updated.privacyZh ?? form.privacyZh ?? '',
+        marketingKo: updated.marketingKo ?? form.marketingKo ?? '',
+        marketingEn: updated.marketingEn ?? form.marketingEn ?? '',
+        marketingJa: updated.marketingJa ?? form.marketingJa ?? '',
+        marketingZh: updated.marketingZh ?? form.marketingZh ?? '',
         links: updated.links,
       };
       const langs = Array.isArray(updated.enabledLanguages)
@@ -220,13 +269,27 @@ export default function SettingsPage() {
           : settings.waitingNotificationOrder,
       postponePolicy: settings.postponePolicy || 'none',
       postponeLimit: settings.postponeLimit || 3,
-      brandDisplayMode:
-        settings.brandDisplayMode === 'image' ? 'image' : 'image_text',
+      brandDisplayMode: 'image_text',
       theme: settings.theme === 'dark' ? 'dark' : 'light',
+      storeNotice: settings.storeNotice || '',
+      adAreaEnabled: settings.adAreaEnabled !== false,
+      avgWaitMinutesPerTeam: settings.avgWaitMinutesPerTeam ?? 5,
+      kioskNoticeKo: settings.kioskNoticeKo || settings.kioskNotice || '',
+      kioskNoticeEn: settings.kioskNoticeEn || '',
+      kioskNoticeJa: settings.kioskNoticeJa || '',
+      kioskNoticeZh: settings.kioskNoticeZh || '',
       termsKo: settings.termsKo || settings.termsOfUseKo || settings.terms || settings.termsOfUse || '',
       termsEn: settings.termsEn || settings.termsOfUseEn || '',
       termsJa: settings.termsJa || settings.termsOfUseJa || '',
       termsZh: settings.termsZh || settings.termsOfUseZh || '',
+      privacyKo: settings.privacyKo || settings.privacyPolicyKo || settings.privacy || '',
+      privacyEn: settings.privacyEn || settings.privacyPolicyEn || '',
+      privacyJa: settings.privacyJa || settings.privacyPolicyJa || '',
+      privacyZh: settings.privacyZh || settings.privacyPolicyZh || '',
+      marketingKo: settings.marketingKo || settings.marketingPolicyKo || settings.marketing || '',
+      marketingEn: settings.marketingEn || settings.marketingPolicyEn || '',
+      marketingJa: settings.marketingJa || settings.marketingPolicyJa || '',
+      marketingZh: settings.marketingZh || settings.marketingPolicyZh || '',
       links: settings.links,
     };
     const langs = Array.isArray(settings.enabledLanguages)
@@ -248,6 +311,7 @@ export default function SettingsPage() {
     setForm(nextForm);
     setTypes(nextTypes);
     setEnabledLangs(langs);
+    setKakaoAlimtalkMode(settings.kakaoAlimtalkMode || (settings.kakaoAlimtalkLive ? 'live' : 'mock'));
     setSavedSnapshot(snapshotOf(nextForm, nextTypes, langs));
   }, [facilityCode]);
 
@@ -310,10 +374,44 @@ export default function SettingsPage() {
   const canSave =
     dirty && form?.name?.trim() && types.every((t) => t.nameKo.trim()) && !saving;
 
+  const changePassword = async () => {
+    if (!pwForm.currentPassword || !pwForm.newPassword) {
+      showToast('현재 비밀번호와 새 비밀번호를 입력해 주세요.');
+      return;
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      showToast('새 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+    const check = validatePassword(pwForm.newPassword, {
+      username: facilityUser?.username,
+    });
+    if (!check.valid) {
+      showToast(check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await api(`/admin/${facilityCode}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentPassword: pwForm.currentPassword,
+          newPassword: pwForm.newPassword,
+        }),
+      });
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showToast('비밀번호가 변경되었습니다.');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   if (!form) return <div className="center-page">Loading...</div>;
 
-  const isWideBrand = form.brandDisplayMode === 'image';
-  const imageRatioLabel = isWideBrand ? '2.3 : 1' : '1:1';
+  const isWideBrand = false;
+  const imageRatioLabel = '1:1';
 
   return (
     <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -329,6 +427,16 @@ export default function SettingsPage() {
       />
       <main className="admin-main settings-main">
         <h1>설정</h1>
+
+        {kakaoAlimtalkMode === 'mock' && (
+          <div className="admin-alert admin-alert-warn" role="status">
+            카카오 알림톡: 테스트(MOCK) 모드로 동작 중 — 실제 발송 안 됨
+            <span className="admin-alert-sub">
+              서버에 PPURIO_ACCOUNT / PPURIO_AUTH_KEY / PPURIO_SENDER_PROFILE 를 설정하면
+              실발송으로 전환됩니다.
+            </span>
+          </div>
+        )}
 
         <section className="settings-section">
           <label>
@@ -362,60 +470,28 @@ export default function SettingsPage() {
             </label>
           </div>
 
-          <div className="settings-radio-row">
-            <span className="settings-radio-label">시설사 표시 영역</span>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="brandDisplayMode"
-                checked={form.brandDisplayMode === 'image_text'}
-                onChange={() =>
-                  setForm({ ...form, brandDisplayMode: 'image_text' })
-                }
-              />
-              작은 이미지 + 텍스트
-            </label>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="brandDisplayMode"
-                checked={form.brandDisplayMode === 'image'}
-                onChange={() => setForm({ ...form, brandDisplayMode: 'image' })}
-              />
-              이미지 단독
-            </label>
-          </div>
-
           <div className="settings-image-row">
-            <span>시설사 이미지 ({imageRatioLabel})</span>
+            <span>시설사 표시 (작은 이미지 + 텍스트)</span>
             <label className="btn-search file-btn">
               이미지 찾기
               <input type="file" accept="image/*" hidden onChange={uploadImage} />
             </label>
             {form.profileImageUrl ? (
-              <div
-                className={`settings-image-preview ${isWideBrand ? 'wide' : ''}`}
-              >
+              <div className="settings-image-preview">
                 <img src={form.profileImageUrl} alt="시설사" />
-                <button type="button" className="img-remove" onClick={clearImage}>
-                  X
+                <button type="button" className="img-remove" onClick={clearImage} aria-label="이미지 제거">
+                  <AdminCloseIcon />
                 </button>
               </div>
             ) : (
-              <div
-                className={`settings-image-placeholder ${isWideBrand ? 'wide' : ''}`}
-              >
-                IMG
-              </div>
+              <div className="settings-image-placeholder">IMG</div>
             )}
-            {!isWideBrand && (
-              <input
-                className="settings-brand-text"
-                placeholder="텍스트 입력"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            )}
+            <input
+              className="settings-brand-text"
+              placeholder="텍스트 입력"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </div>
 
           <label>
@@ -427,7 +503,7 @@ export default function SettingsPage() {
             />
           </label>
 
-          <div className="settings-dual-row settings-triple-row">
+          <div className="settings-dual-row">
             <label>
               충전 필요 알림 금액
               <div className="inline-unit">
@@ -468,6 +544,8 @@ export default function SettingsPage() {
                 <span>번</span>
               </div>
             </label>
+          </div>
+          <div className="settings-dual-row">
             <label>
               입장 대기 시간 설정
               <div className="inline-unit">
@@ -484,7 +562,57 @@ export default function SettingsPage() {
                 <span>분</span>
               </div>
             </label>
+            <label>
+              1팀당 입장 예상 시간 설정
+              <div className="inline-unit">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="분 입력"
+                  value={form.avgWaitMinutesPerTeam}
+                  onChange={(e) =>
+                    setForm({ ...form, avgWaitMinutesPerTeam: e.target.value })
+                  }
+                />
+                <span>분</span>
+              </div>
+            </label>
           </div>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-radio-row">
+            <span className="settings-radio-label">광고 영역</span>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="adAreaEnabled"
+                checked={form.adAreaEnabled !== false}
+                onChange={() => setForm({ ...form, adAreaEnabled: true })}
+              />
+              노출
+            </label>
+            <label className="settings-radio">
+              <input
+                type="radio"
+                name="adAreaEnabled"
+                checked={form.adAreaEnabled === false}
+                onChange={() => setForm({ ...form, adAreaEnabled: false })}
+              />
+              비노출
+            </label>
+          </div>
+
+          <label>
+            안내 사항
+            <textarea
+              rows={5}
+              placeholder="안내 사항 입력"
+              value={form.storeNotice || ''}
+              onChange={(e) => setForm({ ...form, storeNotice: e.target.value })}
+            />
+          </label>
         </section>
 
         <section className="settings-section">
@@ -606,23 +734,119 @@ export default function SettingsPage() {
         </section>
 
         <section className="settings-section">
-          <h2>약관</h2>
+          <h2>공지사항 설정</h2>
           <div className="term-lang-block">
-            <h3>약관 작성</h3>
             {activeLangFields.map((lang) => (
-              <label key={lang.key}>
-                약관 ({lang.label})
-                <textarea
-                  rows={10}
-                  placeholder="약관 본문을 입력해 주세요"
-                  value={form[`terms${lang.key}`] || ''}
-                  onChange={(e) =>
-                    setForm({ ...form, [`terms${lang.key}`]: e.target.value })
-                  }
-                />
-              </label>
+              <div key={`notice-${lang.key}`} className="term-lang-group">
+                <h3>{lang.label}</h3>
+                <label>
+                  키오스크 공지사항
+                  <HtmlEditor
+                    value={form[`kioskNotice${lang.key}`] || ''}
+                    onChange={(html) =>
+                      setForm({ ...form, [`kioskNotice${lang.key}`]: html })
+                    }
+                    placeholder="공지사항 본문을 입력해 주세요"
+                  />
+                </label>
+              </div>
             ))}
           </div>
+        </section>
+
+        <section className="settings-section">
+          <h2>약관</h2>
+          <div className="term-lang-block">
+            {activeLangFields.map((lang) => (
+              <div key={lang.key} className="term-lang-group">
+                <h3>{lang.label}</h3>
+
+                <label>
+                  1. 이용약관 동의 (필수)
+                  <HtmlEditor
+                    value={form[`terms${lang.key}`] || ''}
+                    onChange={(html) =>
+                      setForm({ ...form, [`terms${lang.key}`]: html })
+                    }
+                    placeholder="이용약관 본문을 입력해 주세요"
+                  />
+                </label>
+
+                <label>
+                  2. 개인정보 수집·이용 동의 (필수)
+                  <HtmlEditor
+                    value={form[`privacy${lang.key}`] || ''}
+                    onChange={(html) =>
+                      setForm({ ...form, [`privacy${lang.key}`]: html })
+                    }
+                    placeholder="개인정보 수집·이용 동의 본문을 입력해 주세요"
+                  />
+                </label>
+
+                <label>
+                  3. 마케팅 정보 수신 동의 (선택)
+                  <HtmlEditor
+                    value={form[`marketing${lang.key}`] || ''}
+                    onChange={(html) =>
+                      setForm({ ...form, [`marketing${lang.key}`]: html })
+                    }
+                    placeholder="마케팅 정보 수신 동의 본문을 입력해 주세요"
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <h2>비밀번호 변경</h2>
+          <label>
+            현재 비밀번호
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={pwForm.currentPassword}
+              onChange={(e) =>
+                setPwForm({ ...pwForm, currentPassword: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            새 비밀번호
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={pwForm.newPassword}
+              onChange={(e) =>
+                setPwForm({ ...pwForm, newPassword: e.target.value })
+              }
+            />
+            {pwForm.newPassword ? (
+              <PasswordChecklist
+                password={pwForm.newPassword}
+                username={facilityUser?.username}
+              />
+            ) : null}
+          </label>
+          <label>
+            새 비밀번호 확인
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={pwForm.confirmPassword}
+              onChange={(e) =>
+                setPwForm({ ...pwForm, confirmPassword: e.target.value })
+              }
+            />
+          </label>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={pwSaving}
+            onClick={() => changePassword().catch(() => {})}
+          >
+            비밀번호 변경
+          </button>
         </section>
 
         <button

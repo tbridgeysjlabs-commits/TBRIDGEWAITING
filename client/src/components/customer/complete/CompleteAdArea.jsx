@@ -1,4 +1,5 @@
-export default function CompleteAdArea() {
+export default function CompleteAdArea({ visible = true }) {
+  if (!visible) return null;
   return (
     <div
       className="mt-6 flex aspect-[350/320] w-full items-center justify-center rounded-[36px] md:mt-8"

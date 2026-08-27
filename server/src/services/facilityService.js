@@ -4,10 +4,19 @@ import { waitingTypeRepository } from '../repositories/waitingTypeRepository.js'
 import { waitingRepository } from '../repositories/waitingRepository.js';
 import { billingRepository } from '../repositories/billingRepository.js';
 import { paymentRepository } from '../repositories/paymentRepository.js';
+import { noticeRepository } from '../repositories/noticeRepository.js';
 import { nicepayService } from './nicepayService.js';
 import { isPpurioConfigured } from './ppurioClient.js';
 import { createError } from '../middleware/errorHandler.js';
+import { validatePassword } from '../utils/passwordPolicy.js';
 import crypto from 'crypto';
+
+function requireStrongPassword(password, username) {
+  const result = validatePassword(password, { username });
+  if (!result.valid) {
+    throw createError(400, result.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
+  }
+}
 
 function pickTerm(row, base, lang) {
   if (lang === 'en') return row[`${base}_en`] || row[base] || '';
@@ -46,18 +55,51 @@ function toPublicFacility(row, lang = 'ko') {
     termsOfUseEn: row.terms_of_use_en || '',
     termsOfUseJa: row.terms_of_use_ja || '',
     termsOfUseZh: row.terms_of_use_zh || '',
+    privacy: pickTerm(row, 'privacy_policy', lang),
+    privacyPolicy: pickTerm(row, 'privacy_policy', lang),
+    privacyKo: row.privacy_policy || '',
+    privacyEn: row.privacy_policy_en || '',
+    privacyJa: row.privacy_policy_ja || '',
+    privacyZh: row.privacy_policy_zh || '',
+    privacyPolicyKo: row.privacy_policy || '',
+    privacyPolicyEn: row.privacy_policy_en || '',
+    privacyPolicyJa: row.privacy_policy_ja || '',
+    privacyPolicyZh: row.privacy_policy_zh || '',
+    marketing: pickTerm(row, 'marketing_policy', lang),
+    marketingPolicy: pickTerm(row, 'marketing_policy', lang),
+    marketingKo: row.marketing_policy || '',
+    marketingEn: row.marketing_policy_en || '',
+    marketingJa: row.marketing_policy_ja || '',
+    marketingZh: row.marketing_policy_zh || '',
+    marketingPolicyKo: row.marketing_policy || '',
+    marketingPolicyEn: row.marketing_policy_en || '',
+    marketingPolicyJa: row.marketing_policy_ja || '',
+    marketingPolicyZh: row.marketing_policy_zh || '',
     enabledLanguages: row.enabled_languages || ['ko'],
-    brandDisplayMode: row.brand_display_mode === 'image' ? 'image' : 'image_text',
+    /** 시설 표시는 항상 작은 이미지 + 텍스트 */
+    brandDisplayMode: 'image_text',
     theme: row.theme === 'dark' ? 'dark' : 'light',
     signageTemplateKey: row.signage_template_key || 'basic',
     postponePolicy: row.postpone_policy || 'none',
     postponeLimit: Number(row.postpone_limit || 3),
     entryWaitMinutes: Math.max(1, Number(row.entry_wait_minutes || 5)),
+    avgWaitMinutesPerTeam: Math.max(
+      1,
+      Number(row.avg_wait_minutes_per_team || 5)
+    ),
     waitingNotificationOrder:
       row.waiting_notification_order == null ||
       Number(row.waiting_notification_order) < 1
         ? null
         : Number(row.waiting_notification_order),
+    storeNotice: row.store_notice || '',
+    adAreaEnabled: row.ad_area_enabled !== false,
+    kioskNotice: pickTerm(row, 'kiosk_notice', lang),
+    kioskNoticeKo: row.kiosk_notice || '',
+    kioskNoticeEn: row.kiosk_notice_en || '',
+    kioskNoticeJa: row.kiosk_notice_ja || '',
+    kioskNoticeZh: row.kiosk_notice_zh || '',
+    masterUsername: row.master_username || '',
     kakaoBalance: balance,
     kakaoUnitCost: Number(row.kakao_unit_cost || 20),
     kakaoWarningThreshold: warning,
@@ -102,6 +144,7 @@ export const facilityService = {
     }
     const pendingCount = await waitingRepository.getPendingCount(facility.id);
     const waitingTypes = await waitingTypeRepository.listByFacility(facility.id);
+    const noticeVersion = await noticeRepository.findLatestVersion();
     return {
       ...toPublicFacility(facility, lang),
       pendingCount,
@@ -109,7 +152,8 @@ export const facilityService = {
         ...mapType(t),
         name: localizeTypeName(t, lang),
       })),
-      systemVersion: process.env.SYSTEM_VERSION || 'v260901_01',
+      systemVersion:
+        noticeVersion || process.env.SYSTEM_VERSION || 'v260901_01',
     };
   },
 
@@ -125,6 +169,7 @@ export const facilityService = {
     const exists = await facilityRepository.findByCode(input.facilityCode);
     if (exists) throw createError(409, '이미 사용 중인 시설사 코드입니다.');
 
+    requireStrongPassword(input.masterPassword, input.masterUsername);
     const passwordHash = await bcrypt.hash(input.masterPassword, 10);
     const facility = await facilityRepository.create({
       facilityCode: input.facilityCode,
@@ -163,10 +208,13 @@ export const facilityService = {
     }
     if (
       data.brandDisplayMode != null &&
-      !['image_text', 'image'].includes(data.brandDisplayMode)
+      data.brandDisplayMode !== 'image_text' &&
+      data.brandDisplayMode !== 'image'
     ) {
       throw createError(400, '잘못된 시설사 표시 방식입니다.');
     }
+    // 표시 방식은 항상 작은 이미지+텍스트로 고정 저장
+    data.brandDisplayMode = 'image_text';
     if (data.theme != null && !['light', 'dark'].includes(data.theme)) {
       throw createError(400, '잘못된 테마입니다.');
     }
@@ -176,6 +224,13 @@ export const facilityService = {
         throw createError(400, '입장 대기 시간은 1분 이상이어야 합니다.');
       }
       data.entryWaitMinutes = minutes;
+    }
+    if (data.avgWaitMinutesPerTeam != null) {
+      const minutes = Number(data.avgWaitMinutesPerTeam);
+      if (!Number.isInteger(minutes) || minutes < 1) {
+        throw createError(400, '1팀당 입장 예상 시간은 1분 이상이어야 합니다.');
+      }
+      data.avgWaitMinutesPerTeam = minutes;
     }
 
     if (Object.prototype.hasOwnProperty.call(data, 'waitingNotificationOrder')) {
@@ -189,6 +244,10 @@ export const facilityService = {
         }
         data.waitingNotificationOrder = order;
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'adAreaEnabled')) {
+      data.adAreaEnabled = !!data.adAreaEnabled;
     }
 
     // profileImageUrl empty string means clear
@@ -213,6 +272,49 @@ export const facilityService = {
     }
 
     return this.getPublicFacility(facilityCode);
+  },
+
+  async updateFacilityBySystem(facilityCode, data) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+
+    if (data.facilityCode != null && data.facilityCode !== facility.facility_code) {
+      throw createError(400, '시설사 코드는 변경할 수 없습니다.');
+    }
+
+    const patch = {
+      name: data.name,
+      kakaoUnitCost: data.kakaoUnitCost,
+      status: data.status,
+      masterUsername: data.masterUsername,
+    };
+
+    if (data.kakaoUnitCost != null) {
+      const unitCost = Number(data.kakaoUnitCost);
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        throw createError(400, '카카오 알림톡 발송 비용은 숫자로 입력해 주세요.');
+      }
+      patch.kakaoUnitCost = unitCost;
+    }
+
+    if (data.status != null) {
+      patch.status = data.status === 'withdraw' || data.status === 'inactive'
+        ? data.status
+        : 'active';
+    }
+
+    if (data.masterPassword != null && String(data.masterPassword).length > 0) {
+      const username =
+        data.masterUsername != null
+          ? data.masterUsername
+          : facility.master_username;
+      requireStrongPassword(String(data.masterPassword), username);
+      patch.masterPasswordHash = await bcrypt.hash(String(data.masterPassword), 10);
+    }
+
+    await facilityRepository.updateFacility(facility.id, patch);
+    const updated = await facilityRepository.findByCode(facilityCode);
+    return toPublicFacility(updated);
   },
 
   async listWaitingTypes(facilityCode) {
@@ -302,6 +404,17 @@ export const facilityService = {
       paymentMethod: options.paymentMethod || '카드(MOCK)',
       receiptUrl: options.receiptUrl,
     });
+    try {
+      const { kakaoService } = await import('./kakaoService.js');
+      await kakaoService.sendChargeNotice({
+        facility,
+        amount: value,
+        balanceAfter: Number(updated.kakao_balance),
+        eventAt: new Date(),
+      });
+    } catch (err) {
+      console.warn('[charge notice]', err?.message || err);
+    }
     return {
       balance: Number(updated.kakao_balance),
       unitCost: Number(updated.kakao_unit_cost),
@@ -454,13 +567,17 @@ export const facilityService = {
       };
     }
 
-    const { usage } = await billingRepository.charge(order.facility_id, Number(order.amount), {
-      note: '알림톡 충전(NicePay)',
-      paymentMethod: '카드(NicePay)',
-      pgTid: result.TID || txTid,
-      pgMoid: moid,
-      receiptUrl: result.ReceiptURL || undefined,
-    });
+    const { usage, facility: charged } = await billingRepository.charge(
+      order.facility_id,
+      Number(order.amount),
+      {
+        note: '알림톡 충전(NicePay)',
+        paymentMethod: '카드(NicePay)',
+        pgTid: result.TID || txTid,
+        pgMoid: moid,
+        receiptUrl: result.ReceiptURL || undefined,
+      }
+    );
 
     await paymentRepository.markPaid(moid, {
       tid: result.TID || txTid,
@@ -469,6 +586,22 @@ export const facilityService = {
       rawResponse: result,
       usageHistoryId: usage.id,
     });
+
+    try {
+      const { kakaoService } = await import('./kakaoService.js');
+      const fac =
+        (await facilityRepository.findById(order.facility_id)) || charged;
+      if (fac) {
+        await kakaoService.sendChargeNotice({
+          facility: fac,
+          amount: Number(order.amount),
+          balanceAfter: Number(charged?.kakao_balance ?? fac.kakao_balance),
+          eventAt: new Date(),
+        });
+      }
+    } catch (err) {
+      console.warn('[charge notice]', err?.message || err);
+    }
 
     return {
       redirectUrl: nicepayService.clientResultUrl(facilityCode, {
@@ -581,6 +714,20 @@ export const facilityService = {
     }
     if (result.error === 'EXCEEDS_BALANCE') {
       throw createError(400, '시설사 잔액보다 많은 금액을 취소할 수 없습니다.');
+    }
+    try {
+      const { kakaoService } = await import('./kakaoService.js');
+      const fac = await facilityRepository.findById(existing.facility_id);
+      if (fac) {
+        await kakaoService.sendRefundNotice({
+          facility: fac,
+          amount: cancelAmount,
+          balanceAfter: result.balance,
+          eventAt: new Date(),
+        });
+      }
+    } catch (err) {
+      console.warn('[refund notice]', err?.message || err);
     }
     return {
       item: this.mapUsageRow(result.usage),

@@ -1,175 +1,195 @@
 /**
  * 뿌리오 알림톡 템플릿 코드 / changeWord(var1~) 매핑
- *
- * 템플릿 본문·버튼의 [*1*]~[*8*] ↔ changeWord.var1~var8
- *
- * ─── 등록 템플릿(미루기없음 ppur_202608101036…) 실측 기반 ───
- * 증상: var4/var5에 URL을 넣자 "대기번호"/"인원" 자리에 URL이 출력됨
- *  → [*4*] = 대기번호(당일 순번, 숫자), [*5*] = 인원(숫자)
- *  → 본문 숫자 슬롯에 URL을 넣지 말 것
- *
- * 버튼 URL:
- *  - 뿌리오 `/v1/kakao` 요청에는 버튼 URL 전용 필드가 없음 (targets[].changeWord 만 사용)
- *  - 버튼 웹링크에 `[*n*]`(또는 동일 변수)를 넣어 템플릿 등록한 경우에만 changeWord로 치환됨
- *  - 아래 var6~var8 에 절대 URL을 넣음. 템플릿 버튼이 [*6*]~[*8*] 을 쓰는지
- *    뿌리오 콘솔에서 반드시 재확인 필요. 고정 URL로 등록됐다면 템플릿 재심사 필요.
- *
- * [사람 확인] 뿌리오 > 카카오톡 > 알림톡 템플릿 관리에서
- * 본문 [*1*]~[*5*] 위치와 버튼 Mobile/PC URL 변수 슬롯을 캡처해 알려주시면 재조정합니다.
+ * 본문의 [*n*] ↔ changeWord.varn (번호 건너뛰기 허용 — APPROACHING의 var4·var5 없음)
  */
 
 export const TEMPLATE = {
-  /** 등록 — 미루기: 마지막 순서 */
-  LAST_ORDER: 'LAST_ORDER',
-  /** 등록 — 미루기: 선택 순서 */
-  CHOSEN_ORDER: 'CHOSEN_ORDER',
-  /** 등록 — 미루기 없음 */
-  NO_POSTPONE: 'NO_POSTPONE',
-  /** 입장 임박 */
+  REGISTERED: 'REGISTERED',
   APPROACHING: 'APPROACHING',
-  /** 입장 호출 */
   CALL_ENTRY: 'CALL_ENTRY',
-  /** 대기 취소 */
-  CANCEL: 'CANCEL',
-  /** 미루기 완료 */
-  POSTPONE_DONE: 'POSTPONE_DONE',
-  /** 호출 시간 초과 취소 */
   TIMEOUT_CANCEL: 'TIMEOUT_CANCEL',
+  POSTPONE_DONE: 'POSTPONE_DONE',
+  CANCEL: 'CANCEL',
+  REFUND: 'REFUND',
+  CHARGE: 'CHARGE',
+  // 하위 호환 별칭 → REGISTERED
+  LAST_ORDER: 'REGISTERED',
+  CHOSEN_ORDER: 'REGISTERED',
+  NO_POSTPONE: 'REGISTERED',
 };
 
 const ENV_KEYS = {
-  [TEMPLATE.LAST_ORDER]: 'PPURIO_TEMPLATE_LAST_ORDER',
-  [TEMPLATE.CHOSEN_ORDER]: 'PPURIO_TEMPLATE_CHOSEN_ORDER',
-  [TEMPLATE.NO_POSTPONE]: 'PPURIO_TEMPLATE_NO_POSTPONE',
+  [TEMPLATE.REGISTERED]: 'PPURIO_TEMPLATE_REGISTERED',
   [TEMPLATE.APPROACHING]: 'PPURIO_TEMPLATE_APPROACHING',
   [TEMPLATE.CALL_ENTRY]: 'PPURIO_TEMPLATE_CALL_ENTRY',
-  [TEMPLATE.CANCEL]: 'PPURIO_TEMPLATE_CANCEL',
-  [TEMPLATE.POSTPONE_DONE]: 'PPURIO_TEMPLATE_POSTPONE_DONE',
   [TEMPLATE.TIMEOUT_CANCEL]: 'PPURIO_TEMPLATE_TIMEOUT_CANCEL',
+  [TEMPLATE.POSTPONE_DONE]: 'PPURIO_TEMPLATE_POSTPONE_DONE',
+  [TEMPLATE.CANCEL]: 'PPURIO_TEMPLATE_CANCEL',
+  [TEMPLATE.REFUND]: 'PPURIO_TEMPLATE_REFUND',
+  [TEMPLATE.CHARGE]: 'PPURIO_TEMPLATE_CHARGE',
 };
 
 const DEFAULT_CODES = {
-  [TEMPLATE.LAST_ORDER]: 'ppur_2026081011012424417461220',
-  [TEMPLATE.CHOSEN_ORDER]: 'ppur_2026081010513547407847827',
-  [TEMPLATE.NO_POSTPONE]: 'ppur_2026081010363124417778583',
-  [TEMPLATE.APPROACHING]: 'ppur_2026081011524724417352840',
-  [TEMPLATE.CALL_ENTRY]: 'ppur_2026081011564824417569750',
-  [TEMPLATE.CANCEL]: 'ppur_2026081011575247407264007',
-  [TEMPLATE.POSTPONE_DONE]: 'ppur_2026081012040224417995230',
-  [TEMPLATE.TIMEOUT_CANCEL]: 'ppur_2026081012005647407878148',
+  [TEMPLATE.REGISTERED]: 'ppur_2026081911072324417655171',
+  [TEMPLATE.APPROACHING]: 'ppur_2026081911054024417231502',
+  [TEMPLATE.CALL_ENTRY]: 'ppur_2026081911043647407558286',
+  [TEMPLATE.TIMEOUT_CANCEL]: 'ppur_2026081911024547407465933',
+  [TEMPLATE.POSTPONE_DONE]: 'ppur_2026081911012247407706584',
+  [TEMPLATE.CANCEL]: 'ppur_2026081910595547407136242',
+  [TEMPLATE.REFUND]: 'ppur_2026081812234847407727731',
+  [TEMPLATE.CHARGE]: 'ppur_2026081812114047407778284',
 };
 
 export function getTemplateCode(templateKey) {
-  const envName = ENV_KEYS[templateKey];
+  const key = templateKey === 'LAST_ORDER' || templateKey === 'CHOSEN_ORDER' || templateKey === 'NO_POSTPONE'
+    ? TEMPLATE.REGISTERED
+    : templateKey;
+  const envName = ENV_KEYS[key];
   const fromEnv = envName ? process.env[envName] : '';
-  return (fromEnv && String(fromEnv).trim()) || DEFAULT_CODES[templateKey] || '';
+  return (fromEnv && String(fromEnv).trim()) || DEFAULT_CODES[key] || '';
+}
+
+/** 등록 완료는 미루기 정책과 무관하게 단일 템플릿 */
+export function registrationTemplateKey() {
+  return TEMPLATE.REGISTERED;
+}
+
+function formatDt(date, withSeconds = false) {
+  const d = date instanceof Date ? date : new Date(date || Date.now());
+  if (Number.isNaN(d.getTime())) return '';
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return withSeconds
+    ? `${yy}.${mm}.${dd} ${hh}:${mi}:${ss}`
+    : `${yy}.${mm}.${dd} ${hh}:${mi}`;
 }
 
 /**
- * 등록 알림톡 템플릿 키 — 시설 미루기 정책에 따라 분기
- */
-export function registrationTemplateKey(postponePolicy) {
-  if (postponePolicy === 'select_position') return TEMPLATE.CHOSEN_ORDER;
-  if (postponePolicy === 'last_position') return TEMPLATE.LAST_ORDER;
-  return TEMPLATE.NO_POSTPONE;
-}
-
-/**
- * 컨텍스트 → changeWord
- *
- * ctx: {
- *   facilityName, dailySeq, totalCount, waitOrder,
- *   remainingOrder, aheadCount, newOrder, entryWaitMinutes,
- *   completeLink, cancelLink, postponeLink
- * }
+ * ctx fields used across templates:
+ * facilityName, facilityCode, waitingId, dailySeq, totalCount, waitOrder,
+ * remainingOrder / notificationOrder, entryWaitMinutes, postponeLimit,
+ * cancelledAt, eventAt, amount, balanceAfter
  */
 export function buildChangeWord(templateKey, ctx = {}) {
   const s = (v) => (v === undefined || v === null ? '' : String(v));
+  const key =
+    templateKey === 'LAST_ORDER' ||
+    templateKey === 'CHOSEN_ORDER' ||
+    templateKey === 'NO_POSTPONE'
+      ? TEMPLATE.REGISTERED
+      : templateKey;
+
+  const facilityName = s(ctx.facilityName);
+  const facilityCode = s(ctx.facilityCode);
+  const waitingId = s(ctx.waitingId);
   const waitOrder = s(ctx.waitOrder || ctx.remainingOrder || ctx.dailySeq);
   const dailySeq = s(ctx.dailySeq);
   const totalCount = s(ctx.totalCount);
-  const links = {
-    var6: s(ctx.completeLink),
-    var7: s(ctx.postponeLink),
-    var8: s(ctx.cancelLink),
-  };
+  const entryWaitMinutes = s(ctx.entryWaitMinutes);
+  const notificationOrder = s(
+    ctx.notificationOrder ?? ctx.remainingOrder ?? ctx.waitOrder
+  );
 
-  switch (templateKey) {
-    case TEMPLATE.LAST_ORDER:
-    case TEMPLATE.CHOSEN_ORDER:
-    case TEMPLATE.NO_POSTPONE:
-      // 실측: [*4*]=대기번호(숫자), [*5*]=인원(숫자) — URL 금지
-      // [*1*]시설명 [*2*]현재입장대기순서 [*3*]대기번호(보조) [*4*]대기번호 [*5*]인원
-      // [*6*]확인URL [*7*]미루기URL [*8*]취소URL (버튼이 이 슬롯을 쓸 때)
+  switch (key) {
+    case TEMPLATE.REGISTERED:
+      // [*1*]시설명 [*2*]입장대기순서 [*3*]당일순번 [*4*]인원 [*5*]facilityCode [*6*]waitingId
       return {
-        var1: s(ctx.facilityName),
+        var1: facilityName,
         var2: waitOrder,
         var3: dailySeq,
-        var4: dailySeq,
-        var5: totalCount,
-        ...links,
+        var4: totalCount,
+        var5: facilityCode,
+        var6: waitingId,
       };
 
     case TEMPLATE.APPROACHING:
-      // 본문 숫자만 — URL은 var6 (이전 var5=URL 은 동일 버그 가능)
+      // [*1*]시설명 [*2*]알림순번 [*3*]facilityCode [*6*]waitingId (4·5 없음)
       return {
-        var1: s(ctx.facilityName),
-        var2: dailySeq,
-        var3: s(ctx.remainingOrder),
-        var4: s(ctx.aheadCount),
-        var5: s(ctx.remainingOrder),
-        ...links,
+        var1: facilityName,
+        var2: notificationOrder,
+        var3: facilityCode,
+        var6: waitingId,
       };
 
     case TEMPLATE.CALL_ENTRY:
+      // [*1*]당일순번 [*2*]시설명 [*3*]입장대기시간 [*4*]facilityCode [*5*]waitingId
       return {
-        var1: s(ctx.facilityName),
-        var2: dailySeq,
-        var3: s(ctx.entryWaitMinutes),
-        var4: dailySeq,
-        var5: totalCount,
-        ...links,
+        var1: dailySeq,
+        var2: facilityName,
+        var3: entryWaitMinutes,
+        var4: facilityCode,
+        var5: waitingId,
       };
 
-    case TEMPLATE.CANCEL:
     case TEMPLATE.TIMEOUT_CANCEL:
+      // [*1*]입장대기시간 [*2*]시설명 [*3*]취소시각 YY.MM.DD hh:mm
       return {
-        var1: s(ctx.facilityName),
-        var2: dailySeq,
-        var3: totalCount,
-        ...links,
+        var1: entryWaitMinutes,
+        var2: facilityName,
+        var3: formatDt(ctx.cancelledAt || ctx.eventAt, false),
       };
 
     case TEMPLATE.POSTPONE_DONE:
+      // [*1*]시설명 [*2*]변경순서 [*3*]당일순번 [*4*]인원 [*5*]미루기허용횟수 [*6*]facilityCode [*7*]waitingId
       return {
-        var1: s(ctx.facilityName),
-        var2: dailySeq,
-        var3: s(ctx.newOrder),
-        var4: dailySeq,
-        var5: totalCount,
-        ...links,
+        var1: facilityName,
+        var2: s(ctx.newOrder ?? ctx.waitOrder),
+        var3: dailySeq,
+        var4: totalCount,
+        var5: s(ctx.postponeLimit),
+        var6: facilityCode,
+        var7: waitingId,
+      };
+
+    case TEMPLATE.CANCEL:
+      // [*1*]시설명 [*2*]취소시각 YY.MM.DD hh:mm
+      return {
+        var1: facilityName,
+        var2: formatDt(ctx.cancelledAt || ctx.eventAt, false),
+      };
+
+    case TEMPLATE.REFUND:
+    case TEMPLATE.CHARGE:
+      // [*1*]시설명 [*2*]시각 YY.MM.DD hh:mm:ss [*3*]금액 [*4*]잔액
+      return {
+        var1: facilityName,
+        var2: formatDt(ctx.eventAt, true),
+        var3: s(ctx.amount),
+        var4: s(ctx.balanceAfter),
       };
 
     default:
       return {
-        var1: s(ctx.facilityName),
-        var2: dailySeq,
-        var3: totalCount,
-        ...links,
+        var1: facilityName,
+        var2: waitOrder,
+        var3: dailySeq,
+        var4: totalCount,
+        var5: facilityCode,
+        var6: waitingId,
       };
   }
 }
 
 export function templateDisplayName(templateKey) {
+  const key =
+    templateKey === 'LAST_ORDER' ||
+    templateKey === 'CHOSEN_ORDER' ||
+    templateKey === 'NO_POSTPONE'
+      ? TEMPLATE.REGISTERED
+      : templateKey;
   const names = {
-    [TEMPLATE.LAST_ORDER]: '웨이팅등록(마지막순번)',
-    [TEMPLATE.CHOSEN_ORDER]: '웨이팅등록(선택순번)',
-    [TEMPLATE.NO_POSTPONE]: '웨이팅등록(미루기없음)',
-    [TEMPLATE.APPROACHING]: '웨이팅입장 임박안내',
-    [TEMPLATE.CALL_ENTRY]: '입장 호출',
-    [TEMPLATE.CANCEL]: '대기 취소',
-    [TEMPLATE.POSTPONE_DONE]: '미루기 완료',
-    [TEMPLATE.TIMEOUT_CANCEL]: '시간초과 취소',
+    [TEMPLATE.REGISTERED]: '웨이팅 등록 완료 안내',
+    [TEMPLATE.APPROACHING]: '입장 임박 안내',
+    [TEMPLATE.CALL_ENTRY]: '입장 안내',
+    [TEMPLATE.TIMEOUT_CANCEL]: '미입장 웨이팅 취소 안내',
+    [TEMPLATE.POSTPONE_DONE]: '웨이팅 순서 변경 완료 안내',
+    [TEMPLATE.CANCEL]: '웨이팅 취소 완료 안내',
+    [TEMPLATE.REFUND]: '티브리지 웨이팅 환불 안내',
+    [TEMPLATE.CHARGE]: '티브리지 웨이팅 충전 안내',
   };
-  return names[templateKey] || templateKey;
+  return names[key] || key;
 }

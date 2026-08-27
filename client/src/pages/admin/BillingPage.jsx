@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
+import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -187,6 +188,16 @@ export default function BillingPage() {
           </div>
         </div>
 
+        {billing?.kakaoAlimtalkMode === 'mock' && (
+          <div className="admin-alert admin-alert-warn" role="status">
+            카카오 알림톡: 테스트(MOCK) 모드로 동작 중 — 실제 발송 안 됨
+            <span className="admin-alert-sub">
+              서버에 PPURIO_ACCOUNT / PPURIO_AUTH_KEY / PPURIO_SENDER_PROFILE 를 설정하면
+              실발송으로 전환됩니다.
+            </span>
+          </div>
+        )}
+
         {tab === 'summary' && (
           <>
             <div className="billing-balance-bar">
@@ -365,8 +376,8 @@ export default function BillingPage() {
         {open && (
           <div className="modal-backdrop" onClick={() => setOpen(false)}>
             <form className="modal-card charge-modal" onClick={(e) => e.stopPropagation()} onSubmit={charge}>
-              <button type="button" className="close-btn abs" onClick={() => setOpen(false)}>
-                X
+              <button type="button" className="close-btn abs" onClick={() => setOpen(false)} aria-label="닫기">
+                <AdminCloseIcon />
               </button>
               <h2>알림톡 충전</h2>
               <div className="charge-amount-row">

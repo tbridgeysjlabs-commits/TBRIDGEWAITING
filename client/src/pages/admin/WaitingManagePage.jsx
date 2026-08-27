@@ -112,6 +112,13 @@ export default function WaitingManagePage() {
   const complete = async () => {
     if (!selected) return;
     try {
+      // 사이니지 호출 표시를 위해 미호출 상태면 먼저 호출 처리
+      if (!selected.calledAt) {
+        await api(`/admin/${facilityCode}/waitings/${selected.id}/call`, {
+          method: 'POST',
+          body: '{}',
+        });
+      }
       const result = await api(
         `/admin/${facilityCode}/waitings/${selected.id}/complete`,
         { method: 'POST', body: '{}' }

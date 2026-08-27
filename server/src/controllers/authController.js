@@ -22,4 +22,30 @@ export const authController = {
       next(err);
     }
   },
+
+  async changeSystemPassword(req, res, next) {
+    try {
+      const result = await authService.changeSystemPassword(
+        req.user.id,
+        req.body.currentPassword,
+        req.body.newPassword
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async changeFacilityPassword(req, res, next) {
+    try {
+      const result = await authService.changeFacilityPassword(
+        req.params.facilityCode,
+        req.body.currentPassword,
+        req.body.newPassword
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
 };

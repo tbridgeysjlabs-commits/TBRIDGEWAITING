@@ -49,6 +49,16 @@ export const facilityController = {
     }
   },
 
+  async update(req, res, next) {
+    try {
+      res.json(
+        await facilityService.updateFacilityBySystem(req.params.facilityCode, req.body)
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async updateSettings(req, res, next) {
     try {
       res.json(await facilityService.updateSettings(req.params.facilityCode, req.body));

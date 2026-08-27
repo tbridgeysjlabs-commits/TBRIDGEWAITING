@@ -1,4 +1,4 @@
-/** 약관 체크박스 — 기존 34px 대비 약 30% 축소 */
+/** 약관 체크박스 — 미체크 테두리는 테마 변수(--cw-check-border) */
 export default function AgreementCheckbox({ checked, onChange, ariaLabel }) {
   return (
     <button
@@ -9,8 +9,8 @@ export default function AgreementCheckbox({ checked, onChange, ariaLabel }) {
       onClick={() => onChange(!checked)}
       className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] border-2 transition ${
         checked
-          ? 'border-[var(--cw-accent,#8b7cf6)] bg-[var(--cw-accent,#8b7cf6)]'
-          : 'border-gray-300 bg-[var(--cw-check-bg,transparent)]'
+          ? 'border-[var(--cw-accent-deep,#7C3AED)] bg-[var(--cw-accent-deep,#7C3AED)]'
+          : 'border-[var(--cw-check-border,rgba(255,255,255,0.35))] bg-transparent'
       }`}
     >
       {checked && (

@@ -3,13 +3,33 @@ import { authRepository } from '../repositories/authRepository.js';
 import { facilityRepository } from '../repositories/facilityRepository.js';
 import { signToken } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
+import { validatePassword } from '../utils/passwordPolicy.js';
+
+const LOCK_MSG = '로그인 시도가 많아 잠시 후 다시 시도해주세요';
+const AUTH_FAIL_MSG = '아이디 또는 비밀번호가 올바르지 않습니다.';
+
+function isLocked(row) {
+  if (!row?.locked_until) return false;
+  return new Date(row.locked_until).getTime() > Date.now();
+}
 
 export const authService = {
   async loginSystemAdmin(username, password) {
     const admin = await authRepository.findSystemAdmin(username);
-    if (!admin) throw createError(401, '아이디 또는 비밀번호가 올바르지 않습니다.');
+    if (!admin) throw createError(401, AUTH_FAIL_MSG);
+
+    if (isLocked(admin)) {
+      throw createError(429, LOCK_MSG);
+    }
+
     const ok = await bcrypt.compare(password, admin.password_hash);
-    if (!ok) throw createError(401, '아이디 또는 비밀번호가 올바르지 않습니다.');
+    if (!ok) {
+      const updated = await authRepository.recordSystemLoginFailure(admin.id);
+      if (isLocked(updated)) throw createError(429, LOCK_MSG);
+      throw createError(401, AUTH_FAIL_MSG);
+    }
+
+    await authRepository.clearSystemLoginFailures(admin.id);
     const token = signToken({
       role: 'system_admin',
       username: admin.username,
@@ -20,9 +40,20 @@ export const authService = {
 
   async loginFacilityAdmin(facilityCode, username, password) {
     const facility = await facilityRepository.findByMasterUsername(facilityCode, username);
-    if (!facility) throw createError(401, '아이디 또는 비밀번호가 올바르지 않습니다.');
+    if (!facility) throw createError(401, AUTH_FAIL_MSG);
+
+    if (isLocked(facility)) {
+      throw createError(429, LOCK_MSG);
+    }
+
     const ok = await bcrypt.compare(password, facility.master_password_hash);
-    if (!ok) throw createError(401, '아이디 또는 비밀번호가 올바르지 않습니다.');
+    if (!ok) {
+      const updated = await facilityRepository.recordLoginFailure(facility.id);
+      if (isLocked(updated)) throw createError(429, LOCK_MSG);
+      throw createError(401, AUTH_FAIL_MSG);
+    }
+
+    await facilityRepository.clearLoginFailures(facility.id);
     const token = signToken({
       role: 'facility_admin',
       username: facility.master_username,
@@ -39,5 +70,46 @@ export const authService = {
         facilityName: facility.name,
       },
     };
+  },
+
+  async changeSystemPassword(adminId, currentPassword, newPassword) {
+    const admin = await authRepository.findSystemAdminById(adminId);
+    if (!admin) throw createError(404, '계정을 찾을 수 없습니다.');
+
+    const ok = await bcrypt.compare(String(currentPassword || ''), admin.password_hash);
+    if (!ok) throw createError(400, '현재 비밀번호가 올바르지 않습니다.');
+
+    const check = validatePassword(newPassword, { username: admin.username });
+    if (!check.valid) {
+      throw createError(400, check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
+    }
+
+    const hash = await bcrypt.hash(String(newPassword), 10);
+    await authRepository.updateSystemPassword(admin.id, hash);
+    return { ok: true };
+  },
+
+  async changeFacilityPassword(facilityCode, currentPassword, newPassword) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+
+    const ok = await bcrypt.compare(
+      String(currentPassword || ''),
+      facility.master_password_hash
+    );
+    if (!ok) throw createError(400, '현재 비밀번호가 올바르지 않습니다.');
+
+    const check = validatePassword(newPassword, {
+      username: facility.master_username,
+    });
+    if (!check.valid) {
+      throw createError(400, check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
+    }
+
+    const hash = await bcrypt.hash(String(newPassword), 10);
+    await facilityRepository.updateFacility(facility.id, {
+      masterPasswordHash: hash,
+    });
+    return { ok: true };
   },
 };
