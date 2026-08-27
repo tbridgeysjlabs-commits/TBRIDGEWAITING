@@ -1,3 +1,5 @@
+import { formatDateTimeKst } from '../utils/datetime.js';
+
 /**
  * 뿌리오 알림톡 템플릿 코드 / changeWord(var1~) 매핑
  * 본문의 [*n*] ↔ changeWord.varn (번호 건너뛰기 허용 — APPROACHING의 var4·var5 없음)
@@ -55,17 +57,7 @@ export function registrationTemplateKey() {
 }
 
 function formatDt(date, withSeconds = false) {
-  const d = date instanceof Date ? date : new Date(date || Date.now());
-  if (Number.isNaN(d.getTime())) return '';
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return withSeconds
-    ? `${yy}.${mm}.${dd} ${hh}:${mi}:${ss}`
-    : `${yy}.${mm}.${dd} ${hh}:${mi}`;
+  return formatDateTimeKst(date, withSeconds);
 }
 
 /**

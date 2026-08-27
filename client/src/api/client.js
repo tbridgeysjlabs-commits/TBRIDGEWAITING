@@ -1,3 +1,10 @@
+import {
+  formatDateKst,
+  formatDateTimeKst,
+  formatNowKst,
+  formatTimeKst,
+} from '../utils/datetime.js';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/api`
   : '/api';
@@ -57,42 +64,19 @@ export function formatPhoneDisplay(digits) {
 }
 
 export function formatNow() {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  return `${yy}.${mm}/${dd} ${hh}:${mi}`;
+  return formatNowKst();
 }
 
 export function formatTime(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mi}`;
+  return formatTimeKst(iso);
 }
 
 export function formatDateYYMMDD(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}.${mm}.${dd}`;
+  return formatDateKst(value);
 }
 
 export function formatDateTime(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${yy}.${mm}.${dd} ${hh}:${mi}:${ss}`;
+  return formatDateTimeKst(value);
 }
 
 export function formatDuration(seconds) {

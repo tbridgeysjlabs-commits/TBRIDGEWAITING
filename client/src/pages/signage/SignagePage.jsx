@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, formatTime } from '../../api/client';
+import { toKstClockParts } from '../../utils/datetime.js';
 import styles from './SignagePage.module.css';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -36,16 +37,14 @@ function useSignageClock(intervalMs = 1000) {
 }
 
 function buildClockParts(now) {
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
+  const p = toKstClockParts(now);
+  if (!p) {
+    return { date: '--.--.-- (-)', time: '--:--', sec: '--' };
+  }
   return {
-    date: `${yy}.${mm}.${dd} (${WEEKDAYS[now.getDay()]})`,
-    time: `${hh}:${mi}`,
-    sec: ss,
+    date: `${p.yy}.${p.mm}.${p.dd} (${WEEKDAYS[p.weekday]})`,
+    time: `${p.hh}:${p.mi}`,
+    sec: p.ss,
   };
 }
 

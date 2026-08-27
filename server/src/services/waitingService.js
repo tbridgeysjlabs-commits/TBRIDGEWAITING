@@ -4,6 +4,7 @@ import { waitingRepository } from '../repositories/waitingRepository.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 import { kakaoService } from './kakaoService.js';
 import { createError } from '../middleware/errorHandler.js';
+import { formatHourMinuteLabelKst } from '../utils/datetime.js';
 
 function toastForRegisterKakao(kakaoResult) {
   switch (kakaoResult?.reason) {
@@ -133,14 +134,9 @@ function resolveFacility(facilityCode) {
   return facilityRepository.findByCode(facilityCode);
 }
 
-/** 서버 저장 call_deadline_at → "18시 30분" (24시간제) */
+/** 서버 저장 call_deadline_at → "18시 30분" (KST 24시간제) */
 function formatEntryDeadlineLabel(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const hh = d.getHours();
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}시 ${mm}분`;
+  return formatHourMinuteLabelKst(iso);
 }
 
 async function getQueuePosition(facilityId, waitingId) {

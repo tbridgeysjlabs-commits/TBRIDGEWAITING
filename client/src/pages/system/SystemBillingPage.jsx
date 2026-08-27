@@ -7,6 +7,7 @@ import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 import PaymentReceiptModal from '../../components/billing/PaymentReceiptModal';
+import { formatDateTimeKst } from '../../utils/datetime.js';
 
 const PAGE_SIZES = [10, 30, 50, 100, 200];
 
@@ -16,17 +17,11 @@ function formatPhone(phone) {
   return phone || '-';
 }
 
-/** 취소완료(YY.MM.DD hh:mm:ss) */
+/** 취소완료(YY.MM.DD hh:mm:ss) — KST */
 function formatCancelDone(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `취소완료(${yy}.${mm}.${dd} ${hh}:${mi}:${ss})`;
+  const label = formatDateTimeKst(iso);
+  return label ? `취소완료(${label})` : '';
 }
 
 export default function SystemBillingPage() {
@@ -475,7 +470,7 @@ export default function SystemBillingPage() {
 
       {cancelTarget && (
         <div className="modal-backdrop" onClick={() => !cancelling && setCancelTarget(null)}>
-          <div className="modal charge-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card charge-modal" onClick={(e) => e.stopPropagation()}>
             <h2>결제 취소</h2>
             <p style={{ marginBottom: 12, color: '#555' }}>
               {cancelTarget.facilityName} · 충전금액{' '}

@@ -1,17 +1,13 @@
 import crypto from 'crypto';
 import { createError } from '../middleware/errorHandler.js';
+import { formatEdiDateKst } from '../utils/datetime.js';
 
 function sha256Hex(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 }
 
 function ediDateNow() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return (
-    `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
-    `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-  );
+  return formatEdiDateKst(new Date());
 }
 
 function getConfig() {

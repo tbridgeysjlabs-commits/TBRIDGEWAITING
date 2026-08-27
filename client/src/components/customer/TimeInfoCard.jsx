@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react';
 import { WEEK_LABELS } from '../../hooks/useI18n';
+import { toKstClockParts } from '../../utils/datetime.js';
 
 function parts(now = new Date(), lang = 'ko') {
   const week = WEEK_LABELS[lang] || WEEK_LABELS.ko;
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
+  const p = toKstClockParts(now);
+  if (!p) {
+    return { dateLabel: '--.--.-- (-)', hh: '--', mi: '--', ss: '--' };
+  }
   return {
-    dateLabel: `${yy}.${mm}.${dd} (${week[now.getDay()]})`,
-    hh,
-    mi,
-    ss,
+    dateLabel: `${p.yy}.${p.mm}.${p.dd} (${week[p.weekday]})`,
+    hh: p.hh,
+    mi: p.mi,
+    ss: p.ss,
   };
 }
 

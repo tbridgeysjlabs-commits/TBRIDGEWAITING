@@ -12,20 +12,12 @@ import CompleteCancelledAlert from '../../components/customer/complete/CompleteC
 import CompleteAdArea from '../../components/customer/complete/CompleteAdArea';
 import CompleteStoreNotice from '../../components/customer/complete/CompleteStoreNotice';
 import { themeStyle } from '../../theme/customerTheme';
+import { formatRegisteredAtKst } from '../../utils/datetime.js';
 
 const CANCELLED_STATUSES = new Set(['cancelled', 'admin_cancelled', 'no_show']);
 
 function formatRegisteredAt(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hour = d.getHours();
-  const ampm = hour < 12 ? '오전' : '오후';
-  const h12 = hour % 12 || 12;
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `대기 등록 ${yyyy}.${mm}.${dd} ${ampm} ${String(h12).padStart(2, '0')}:${mi}`;
+  return formatRegisteredAtKst(iso);
 }
 
 export default function CompletePage() {
