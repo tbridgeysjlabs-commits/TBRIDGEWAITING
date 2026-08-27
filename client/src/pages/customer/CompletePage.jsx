@@ -7,9 +7,13 @@ import CompleteCloseHeader from '../../components/customer/complete/CompleteClos
 import CompleteFacilityInfo from '../../components/customer/complete/CompleteFacilityInfo';
 import CompleteWaitingStatus from '../../components/customer/complete/CompleteWaitingStatus';
 import CompleteActionButtons from '../../components/customer/complete/CompleteActionButtons';
+import CompleteCallNotice from '../../components/customer/complete/CompleteCallNotice';
+import CompleteCancelledAlert from '../../components/customer/complete/CompleteCancelledAlert';
 import CompleteAdArea from '../../components/customer/complete/CompleteAdArea';
 import CompleteStoreNotice from '../../components/customer/complete/CompleteStoreNotice';
 import { themeStyle } from '../../theme/customerTheme';
+
+const CANCELLED_STATUSES = new Set(['cancelled', 'admin_cancelled', 'no_show']);
 
 function formatRegisteredAt(iso) {
   if (!iso) return '';
@@ -31,18 +35,36 @@ export default function CompletePage() {
   const [toast, setToast] = useState('');
   const [lastModal, setLastModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cancelledAlert, setCancelledAlert] = useState(false);
+
+  const leavePage = useCallback(() => {
+    setCancelledAlert(false);
+    navigate(`/w/${facilityCode}`, { replace: true });
+  }, [facilityCode, navigate]);
 
   const load = useCallback(async () => {
     const result = await api(
       `/facilities/${facilityCode}/waitings/${waitingId}/complete`
     );
     setData(result);
+    if (CANCELLED_STATUSES.has(result?.waiting?.status)) {
+      setCancelledAlert(true);
+    }
     return result;
   }, [facilityCode, waitingId]);
 
   useEffect(() => {
     load().catch((e) => setToast(e.message));
   }, [load]);
+
+  // 호출 상태 반영을 위해 pending 동안 주기적으로 최신 상태 조회
+  useEffect(() => {
+    if (!data || data.waiting?.status !== 'pending') return undefined;
+    const id = setInterval(() => {
+      load().catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [data?.waiting?.status, load]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -56,7 +78,6 @@ export default function CompletePage() {
         method: 'POST',
         body: JSON.stringify({ by: 'customer' }),
       });
-      showToast('대기 등록이 취소되었습니다.');
       await load();
     } catch (e) {
       showToast(e.message);
@@ -105,10 +126,28 @@ export default function CompletePage() {
   }
 
   const { facility, waiting } = data;
+  const isCancelled = CANCELLED_STATUSES.has(waiting.status);
   const isPending = waiting.status === 'pending';
   const showPostpone = facility.postponePolicy !== 'none' && isPending;
+  const showCallNotice =
+    isPending && Boolean(waiting.calledAt && waiting.entryDeadlineLabel);
   const theme = facility.theme === 'dark' ? 'dark' : 'light';
   const style = themeStyle(theme);
+
+  // 취소된 건: 본문 숨기고 알럿만
+  if (isCancelled || cancelledAlert) {
+    return (
+      <div
+        className="min-h-dvh w-full max-w-[100vw] overflow-x-hidden font-['Pretendard','Noto_Sans_KR',sans-serif]"
+        style={{
+          ...style,
+          background: `linear-gradient(to bottom right, var(--cw-bg), var(--cw-bg-mid), var(--cw-bg-end))`,
+        }}
+      >
+        <CompleteCancelledAlert open onConfirm={leavePage} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -141,6 +180,9 @@ export default function CompletePage() {
           isPending={isPending}
           onRefresh={() => load().catch((e) => showToast(e.message))}
         >
+          {showCallNotice && (
+            <CompleteCallNotice deadlineLabel={waiting.entryDeadlineLabel} />
+          )}
           {isPending && (
             <CompleteActionButtons
               showPostpone={showPostpone}

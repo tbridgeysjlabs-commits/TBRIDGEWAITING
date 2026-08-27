@@ -221,6 +221,21 @@ export const waitingRepository = {
     return rows[0] || null;
   },
 
+  /** 호출 후 입장 대기 시간 경과 · 아직 pending 인 건 */
+  async listOverdueCalled(facilityId) {
+    const { rows } = await query(
+      `SELECT * FROM waitings
+       WHERE facility_id = $1
+         AND status = 'pending'
+         AND called_at IS NOT NULL
+         AND call_deadline_at IS NOT NULL
+         AND call_deadline_at <= NOW()
+       ORDER BY call_deadline_at ASC`,
+      [facilityId]
+    );
+    return rows;
+  },
+
   async cancel(id, { status = 'cancelled', cancelledBy = 'customer' } = {}) {
     const { rows } = await query(
       `UPDATE waitings

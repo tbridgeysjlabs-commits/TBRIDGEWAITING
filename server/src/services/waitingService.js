@@ -133,6 +133,16 @@ function resolveFacility(facilityCode) {
   return facilityRepository.findByCode(facilityCode);
 }
 
+/** 서버 저장 call_deadline_at → "18시 30분" (24시간제) */
+function formatEntryDeadlineLabel(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const hh = d.getHours();
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}시 ${mm}분`;
+}
+
 async function getQueuePosition(facilityId, waitingId) {
   const pending = await waitingRepository.listPending(facilityId);
   const index = pending.findIndex((w) => w.id === waitingId);
@@ -143,6 +153,9 @@ export const waitingService = {
   async getBoard(facilityCode) {
     const facility = await resolveFacility(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+
+    // [호출] 후 입장 대기 시간 경과 → 미입장(no_show) 자동 처리 + 4번 알림톡
+    await this.expireCallTimeouts(facility);
 
     const counts = await waitingRepository.getStatusCounts(facility.id);
     const [pending, completed, cancelled] = await Promise.all([
@@ -177,6 +190,28 @@ export const waitingService = {
       completed: mappedCompleted,
       cancelled: cancelled.map((r, i) => mapWaiting(r, i)),
     };
+  },
+
+  /**
+   * 호출 데드라인 경과 건을 no_show 로 자동 취소하고
+   * 미입장 취소 안내(템플릿 4)만 발송한다.
+   */
+  async expireCallTimeouts(facility) {
+    if (!facility?.id) return { expired: 0 };
+    const overdue = await waitingRepository.listOverdueCalled(facility.id);
+    let expired = 0;
+    for (const row of overdue) {
+      try {
+        await this.cancel(facility.facility_code, row.id, {
+          by: 'system',
+          reason: 'no_show',
+        });
+        expired += 1;
+      } catch (err) {
+        console.warn('[expireCallTimeouts]', row.id, err?.message || err);
+      }
+    }
+    return { expired };
   },
 
   async call(facilityCode, waitingId) {
@@ -269,6 +304,10 @@ export const waitingService = {
   async getCompletePage(facilityCode, waitingId) {
     const facility = await resolveFacility(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+
+    // 입장 대기 시간 경과 시 미입장 자동 처리 후 최신 상태 반환
+    await this.expireCallTimeouts(facility);
+
     const waiting = await waitingRepository.findById(waitingId);
     if (!waiting || waiting.facility_id !== facility.id) {
       throw createError(404, '웨이팅 정보를 찾을 수 없습니다.');
@@ -278,6 +317,7 @@ export const waitingService = {
     const postponePolicy = facility.postpone_policy || 'none';
     const postponeLimit = Number(facility.postpone_limit || 3);
     const postponeCount = Number(waiting.postpone_count || 0);
+    const mapped = mapWaiting(waiting, Math.max((position || 1) - 1, 0));
 
     return {
       facility: {
@@ -288,12 +328,15 @@ export const waitingService = {
         theme: facility.theme === 'dark' ? 'dark' : 'light',
         postponePolicy,
         postponeLimit,
+        entryWaitMinutes: Math.max(1, Number(facility.entry_wait_minutes || 5)),
         storeNotice: facility.store_notice || '',
         adAreaEnabled: facility.ad_area_enabled !== false,
       },
       waiting: {
-        ...mapWaiting(waiting, Math.max((position || 1) - 1, 0)),
+        ...mapped,
         order: position,
+        /** 서버에 저장된 call_deadline_at 기준 표시용 (호출시각+입장대기시간) */
+        entryDeadlineLabel: formatEntryDeadlineLabel(waiting.call_deadline_at),
       },
       canPostpone:
         waiting.status === 'pending' &&
@@ -335,23 +378,41 @@ export const waitingService = {
       throw createError(404, '대기 정보를 찾을 수 없습니다.');
     }
 
-    const cancelledBy = by === 'customer' ? 'customer' : 'admin';
-    const status =
-      reason === 'no_show'
-        ? 'no_show'
-        : cancelledBy === 'admin'
-          ? 'admin_cancelled'
-          : 'cancelled';
+    // 취소 사유 분기:
+    // - no_show/timeout → 미입장 자동 취소 (템플릿 4)
+    // - 그 외 사용자/관리자 직접 취소 → 템플릿 6
+    const isNoShow = reason === 'no_show' || reason === 'timeout';
+    const cancelledBy = isNoShow
+      ? 'system'
+      : by === 'customer'
+        ? 'customer'
+        : 'admin';
+    const status = isNoShow
+      ? 'no_show'
+      : cancelledBy === 'admin'
+        ? 'admin_cancelled'
+        : 'cancelled';
 
-    const updated = await waitingRepository.cancel(waitingId, { status, cancelledBy });
+    const updated = await waitingRepository.cancel(waitingId, {
+      status,
+      cancelledBy,
+    });
     if (!updated) throw createError(400, '대기 중인 항목만 취소할 수 있습니다.');
     await waitingRepository.clearImminentNotified(waitingId);
     await waitingRepository.renumberPendingQueue(facility.id);
-    void kakaoService.sendCancel({ facility, waiting: updated, reason });
+
+    // 알림톡: 사유에 따라 4번 또는 6번 중 하나만 발송
+    void kakaoService.sendCancel({
+      facility,
+      waiting: updated,
+      reason: isNoShow ? 'no_show' : 'manual',
+    });
     void kakaoService.notifyImminentEntries(facility);
     return {
       waiting: mapWaiting(updated),
-      toast: '대기취소 리스트로 이동하였습니다.',
+      toast: isNoShow
+        ? '미입장으로 처리되었습니다.'
+        : '대기취소 리스트로 이동하였습니다.',
     };
   },
 

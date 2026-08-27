@@ -52,6 +52,33 @@ export default function WaitingManagePage() {
     return () => clearInterval(id);
   }, [load]);
 
+  // 호출 데드라인 종료 직후 보드 재조회 → 서버에서 미입장(no_show) 자동 처리
+  useEffect(() => {
+    if (!board?.pending?.length) return undefined;
+    const now = Date.now();
+    const futureDeadlines = board.pending
+      .filter((item) => item.calledAt && item.callDeadlineAt)
+      .map((item) => new Date(item.callDeadlineAt).getTime())
+      .filter((t) => t > now);
+
+    if (futureDeadlines.length) {
+      const delay = Math.min(...futureDeadlines) - now + 250;
+      const id = setTimeout(() => load().catch(() => {}), Math.max(delay, 0));
+      return () => clearTimeout(id);
+    }
+
+    const hasOverdue = board.pending.some(
+      (item) =>
+        item.calledAt &&
+        item.callDeadlineAt &&
+        new Date(item.callDeadlineAt).getTime() <= now
+    );
+    if (hasOverdue) {
+      load().catch(() => {});
+    }
+    return undefined;
+  }, [board, load]);
+
   useEffect(() => {
     if (!facilityUser || facilityUser.facilityCode !== facilityCode) return;
     api(`/admin/${facilityCode}/billing`)

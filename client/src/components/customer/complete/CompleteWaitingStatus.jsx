@@ -33,7 +33,7 @@ export default function CompleteWaitingStatus({
               번째
             </span>
           </div>
-          <p className="mb-8 break-keep text-center text-[14px] text-[var(--cw-text-muted,#9ca3af)] sm:text-[15px] md:text-base">
+          <p className="mb-4 break-keep text-center text-[14px] text-[var(--cw-text-muted,#9ca3af)] sm:mb-5 sm:text-[15px] md:text-base">
             대기번호 <strong className="font-bold text-[var(--cw-text-soft,#6b7280)]">{dailySeq}번</strong>
             <span className="mx-2 text-gray-300">|</span>
             인원 <strong className="font-bold text-[var(--cw-text-soft,#6b7280)]">{totalCount}</strong>

@@ -288,16 +288,33 @@ export const kakaoService = {
   },
 
   async sendCancel({ facility, waiting, reason } = {}) {
-    const key =
-      reason === 'no_show' || reason === 'timeout'
-        ? TEMPLATE.TIMEOUT_CANCEL
-        : TEMPLATE.CANCEL;
+    // 4번: 미입장 자동 취소(no_show/timeout)만
+    // 6번: 사용자/관리자 직접 취소(그 외 전부)
+    const status = waiting?.status;
+    const isNoShow =
+      reason === 'no_show' ||
+      reason === 'timeout' ||
+      status === 'no_show';
+
+    const templateKey = isNoShow ? TEMPLATE.TIMEOUT_CANCEL : TEMPLATE.CANCEL;
+
+    console.log('[kakao sendCancel]', {
+      waitingId: waiting?.id,
+      status,
+      reason,
+      templateKey,
+    });
+
     return this.dispatchTemplate({
       facility,
       waiting,
-      templateKey: key,
+      templateKey,
       extraCtx: {
         cancelledAt: waiting?.cancelled_at || waiting?.cancelledAt || new Date(),
+        entryWaitMinutes: Math.max(
+          1,
+          Number(facility.entry_wait_minutes || facility.entryWaitMinutes || 5)
+        ),
       },
     });
   },
