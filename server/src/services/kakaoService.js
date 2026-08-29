@@ -332,14 +332,21 @@ export const kakaoService = {
   },
 
   async sendImminentEntry({ facility, waiting, remainingOrder, aheadCount }) {
+    const notificationOrder = Number(
+      remainingOrder ??
+        facility.waiting_notification_order ??
+        facility.waitingNotificationOrder
+    );
     return this.dispatchTemplate({
       facility,
       waiting,
       templateKey: TEMPLATE.APPROACHING,
       extraCtx: {
-        remainingOrder,
-        notificationOrder: remainingOrder,
+        remainingOrder: notificationOrder,
+        // 관리자 설정의 "입장 대기 알림 순번" (현재 큐 순번과 혼동 금지)
+        notificationOrder,
         aheadCount,
+        waitingId: waiting?.id || waiting?.waitingId || '',
       },
     });
   },

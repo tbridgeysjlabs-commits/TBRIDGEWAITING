@@ -84,6 +84,10 @@ export default function SignagePage() {
     ]);
     const nextPending = board.pending || [];
     const nextCompleted = board.completed || [];
+    // 최근 입장 호출: 호출(calledAt) 이력이 있는 완료 건만 (입장하기만 한 건 제외)
+    const nextRecent =
+      board.recentCalled ||
+      nextCompleted.filter((item) => item.calledAt);
     const nextActive =
       board.currentlyCalled ||
       nextPending
@@ -106,7 +110,7 @@ export default function SignagePage() {
 
     setFacility(f);
     setPending(nextPending);
-    setCompleted(nextCompleted);
+    setCompleted(nextRecent);
     setActiveCall(nextActive);
     setEntryWaitMinutes(
       Math.max(1, Number(board.entryWaitMinutes ?? f.entryWaitMinutes ?? 3))

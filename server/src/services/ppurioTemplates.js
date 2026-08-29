@@ -99,10 +99,11 @@ export function buildChangeWord(templateKey, ctx = {}) {
       };
 
     case TEMPLATE.APPROACHING:
-      // [*1*]시설명 [*2*]알림순번 [*3*]facilityCode [*6*]waitingId (4·5 없음)
+      // 템플릿 원본 변수 번호: [*1*][*2*][*3*][*6*] (4·5 없음)
+      // [*1*]시설명 [*2*]입장대기알림순번 [*3*]facilityCode [*6*]waitingId
       return {
         var1: facilityName,
-        var2: notificationOrder,
+        var2: s(ctx.notificationOrder ?? ctx.remainingOrder),
         var3: facilityCode,
         var6: waitingId,
       };

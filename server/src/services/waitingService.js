@@ -164,19 +164,15 @@ export const waitingService = {
     const mappedCompleted = completed.map((r, i) => mapWaiting(r, i));
     const entryWaitMinutes = Math.max(1, Number(facility.entry_wait_minutes || 5));
 
-    // 호출 중(pending + calledAt) 우선, 없으면 최근 입장완료(입장하기) 팀을 표시
-    let currentlyCalled =
+    // 사이니지 "입장 호출": [호출]로 calledAt 이 찍힌 pending 만 표시
+    // [입장하기]만 한 완료 건은 표시하지 않음
+    const currentlyCalled =
       mappedPending
         .filter((w) => w.calledAt)
         .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
 
-    if (!currentlyCalled && mappedCompleted[0]?.completedAt) {
-      const ageMs =
-        Date.now() - new Date(mappedCompleted[0].completedAt).getTime();
-      if (ageMs <= entryWaitMinutes * 60 * 1000) {
-        currentlyCalled = mappedCompleted[0];
-      }
-    }
+    // 최근 입장 호출: 실제 호출(calledAt) 후 완료된 건만
+    const recentCalled = mappedCompleted.filter((w) => w.calledAt);
 
     return {
       counts,
@@ -184,6 +180,7 @@ export const waitingService = {
       currentlyCalled,
       pending: mappedPending,
       completed: mappedCompleted,
+      recentCalled,
       cancelled: cancelled.map((r, i) => mapWaiting(r, i)),
     };
   },
