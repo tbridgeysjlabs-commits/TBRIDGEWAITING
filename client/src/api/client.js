@@ -56,11 +56,11 @@ export function formatPhoneDisplay(digits) {
   const d = String(digits || '').replace(/\D/g, '').slice(0, 11);
   // 항상 010 접두사를 유지한 채 이어서 표시
   const withPrefix = d.startsWith('010') ? d : `010${d}`.slice(0, 11);
-  if (withPrefix.length <= 3) return '010 - ';
+  if (withPrefix.length <= 3) return '010-';
   if (withPrefix.length <= 7) {
-    return `${withPrefix.slice(0, 3)} - ${withPrefix.slice(3)}`;
+    return `${withPrefix.slice(0, 3)}-${withPrefix.slice(3)}`;
   }
-  return `${withPrefix.slice(0, 3)} - ${withPrefix.slice(3, 7)} - ${withPrefix.slice(7)}`;
+  return `${withPrefix.slice(0, 3)}-${withPrefix.slice(3, 7)}-${withPrefix.slice(7)}`;
 }
 
 export function formatNow() {

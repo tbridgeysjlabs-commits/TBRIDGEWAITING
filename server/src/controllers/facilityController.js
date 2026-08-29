@@ -1,13 +1,14 @@
-import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { facilityService } from '../services/facilityService.js';
+import {
+  createImageUpload,
+  finalizeUploadedImage,
+} from '../utils/imageUpload.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const upload = multer({
-  dest: path.join(__dirname, '../../uploads'),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
+const UPLOAD_DIR = path.join(__dirname, '../../uploads');
+const upload = createImageUpload(UPLOAD_DIR);
 
 export const uploadFacilityImage = upload.single('image');
 
@@ -72,7 +73,13 @@ export const facilityController = {
       if (!req.file) {
         return res.status(400).json({ message: '이미지 파일을 선택해 주세요.' });
       }
-      const url = `/uploads/${req.file.filename}`;
+      let url;
+      try {
+        url = finalizeUploadedImage(req.file, UPLOAD_DIR);
+      } catch (err) {
+        const status = err.status || 400;
+        return res.status(status).json({ message: err.message || '업로드 실패' });
+      }
       const updated = await facilityService.updateSettings(req.params.facilityCode, {
         profileImageUrl: url,
       });

@@ -471,8 +471,17 @@ export default function SystemBillingPage() {
       {cancelTarget && (
         <div className="modal-backdrop" onClick={() => !cancelling && setCancelTarget(null)}>
           <div className="modal-card charge-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="close-btn abs"
+              disabled={cancelling}
+              onClick={() => setCancelTarget(null)}
+              aria-label="닫기"
+            >
+              <AdminCloseIcon />
+            </button>
             <h2>결제 취소</h2>
-            <p style={{ marginBottom: 12, color: '#555' }}>
+            <p className="charge-cancel-summary">
               {cancelTarget.facilityName} · 충전금액{' '}
               {Number(cancelTarget.amount).toLocaleString()}원
               {cancelTarget.facilityBalance != null && (
@@ -482,17 +491,20 @@ export default function SystemBillingPage() {
                 </>
               )}
             </p>
-            <label>
+            <label className="charge-cancel-label">
               취소 금액
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={cancelAmount}
-                onChange={(e) => setCancelAmount(e.target.value)}
-              />
+              <div className="charge-amount-row">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={cancelAmount}
+                  onChange={(e) => setCancelAmount(e.target.value)}
+                />
+                <span>원</span>
+              </div>
             </label>
-            <p style={{ marginTop: 8, fontSize: 13, color: '#777' }}>
+            <p className="charge-cancel-hint">
               부분 취소가 가능합니다. 취소 금액만큼 시설사 알림톡 잔액에서 차감됩니다.
             </p>
             <div className="modal-actions">

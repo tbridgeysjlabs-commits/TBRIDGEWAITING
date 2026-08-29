@@ -3,8 +3,7 @@ import { NavLink } from 'react-router-dom';
 function SidebarBrand() {
   return (
     <div className="sidebar-logo" aria-label="T BRIDGE">
-      <span className="sidebar-logo-mark">T</span>
-      <span className="sidebar-logo-text">BRIDGE</span>
+      <img src="/tbridge_logo.png" alt="T BRIDGE" />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import AdminSidebar from '../../components/admin/AdminSidebar';
-import HtmlEditor from '../../components/HtmlEditor';
 import PasswordChangeModal from '../../components/PasswordChangeModal';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -744,34 +743,40 @@ export default function SettingsPage() {
 
                 <label>
                   1. 이용약관 동의 (필수)
-                  <HtmlEditor
-                    value={form[`terms${lang.key}`] || ''}
-                    onChange={(html) =>
-                      setForm({ ...form, [`terms${lang.key}`]: html })
-                    }
+                  <textarea
+                    rows={5}
                     placeholder="이용약관 본문을 입력해 주세요"
+                    value={form[`terms${lang.key}`] || ''}
+                    onChange={(e) =>
+                      setForm({ ...form, [`terms${lang.key}`]: e.target.value })
+                    }
                   />
                 </label>
 
                 <label>
                   2. 개인정보 수집·이용 동의 (필수)
-                  <HtmlEditor
-                    value={form[`privacy${lang.key}`] || ''}
-                    onChange={(html) =>
-                      setForm({ ...form, [`privacy${lang.key}`]: html })
-                    }
+                  <textarea
+                    rows={5}
                     placeholder="개인정보 수집·이용 동의 본문을 입력해 주세요"
+                    value={form[`privacy${lang.key}`] || ''}
+                    onChange={(e) =>
+                      setForm({ ...form, [`privacy${lang.key}`]: e.target.value })
+                    }
                   />
                 </label>
 
                 <label>
                   3. 마케팅 정보 수신 동의 (선택)
-                  <HtmlEditor
-                    value={form[`marketing${lang.key}`] || ''}
-                    onChange={(html) =>
-                      setForm({ ...form, [`marketing${lang.key}`]: html })
-                    }
+                  <textarea
+                    rows={5}
                     placeholder="마케팅 정보 수신 동의 본문을 입력해 주세요"
+                    value={form[`marketing${lang.key}`] || ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        [`marketing${lang.key}`]: e.target.value,
+                      })
+                    }
                   />
                 </label>
               </div>

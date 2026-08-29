@@ -29,11 +29,6 @@ export default function CompletePage() {
   const [loading, setLoading] = useState(false);
   const [cancelledAlert, setCancelledAlert] = useState(false);
 
-  const leavePage = useCallback(() => {
-    setCancelledAlert(false);
-    navigate(`/w/${facilityCode}`, { replace: true });
-  }, [facilityCode, navigate]);
-
   const load = useCallback(async () => {
     const result = await api(
       `/facilities/${facilityCode}/waitings/${waitingId}/complete`
@@ -136,7 +131,7 @@ export default function CompletePage() {
           background: `linear-gradient(to bottom right, var(--cw-bg), var(--cw-bg-mid), var(--cw-bg-end))`,
         }}
       >
-        <CompleteCancelledAlert open onConfirm={leavePage} />
+        <CompleteCancelledAlert open />
       </div>
     );
   }
