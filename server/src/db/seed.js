@@ -106,7 +106,8 @@ const translations = {
 
 async function seed() {
   const adminHash = await bcrypt.hash('admin1234', 10);
-  const facilityHash = await bcrypt.hash('demo1234', 10);
+  const facilityLoginHash = await bcrypt.hash('admin1234!', 10);
+  const masterHash = await bcrypt.hash('tbridge1234!', 10);
 
   await query(
     `INSERT INTO system_admins (username, password_hash)
@@ -144,12 +145,24 @@ async function seed() {
 
   const facilityResult = await query(
     `INSERT INTO facilities (
-       facility_code, name, master_username, master_password_hash, kakao_sender_key
-     ) VALUES ($1, $2, $3, $4, $5)
+       facility_code, name, master_username,
+       facility_password_hash, master_password_hash, master_password,
+       kakao_sender_key
+     ) VALUES ($1, $2, '', $3, $4, $5, $6)
      ON CONFLICT (facility_code) DO UPDATE
-       SET name = EXCLUDED.name
+       SET name = EXCLUDED.name,
+           facility_password_hash = EXCLUDED.facility_password_hash,
+           master_password_hash = EXCLUDED.master_password_hash,
+           master_password = EXCLUDED.master_password
      RETURNING id`,
-    ['demo-park', '데모 테마파크', 'demo', facilityHash, 'SENDER_DEMO_KEY']
+    [
+      'demo-park',
+      '데모 테마파크',
+      facilityLoginHash,
+      masterHash,
+      'tbridge1234!',
+      'SENDER_DEMO_KEY',
+    ]
   );
 
   const facilityId = facilityResult.rows[0].id;
@@ -261,7 +274,8 @@ async function seed() {
 
   console.log('Seed completed.');
   console.log('System admin: sysadmin / admin1234');
-  console.log('Facility demo: /w/demo-park , admin: demo / demo1234');
+  console.log('Facility demo: /w/demo-park , login password: admin1234!');
+  console.log('Facility master password (system admin): tbridge1234!');
   await pool.end();
 }
 

@@ -9,6 +9,10 @@ import { nicepayService } from './nicepayService.js';
 import { isPpurioConfigured } from './ppurioClient.js';
 import { createError } from '../middleware/errorHandler.js';
 import { validatePassword } from '../utils/passwordPolicy.js';
+import {
+  DEFAULT_FACILITY_PASSWORD,
+  DEFAULT_MASTER_PASSWORD,
+} from '../constants/facilityPasswords.js';
 import crypto from 'crypto';
 
 function requireStrongPassword(password, username) {
@@ -99,7 +103,6 @@ function toPublicFacility(row, lang = 'ko') {
     kioskNoticeEn: row.kiosk_notice_en || '',
     kioskNoticeJa: row.kiosk_notice_ja || '',
     kioskNoticeZh: row.kiosk_notice_zh || '',
-    masterUsername: row.master_username || '',
     kakaoBalance: balance,
     kakaoUnitCost: Number(row.kakao_unit_cost || 20),
     kakaoWarningThreshold: warning,
@@ -116,6 +119,14 @@ function toPublicFacility(row, lang = 'ko') {
       admin: `/admin/${row.facility_code}/login`,
       signage: `/signage/${row.facility_code}`,
     },
+    };
+}
+
+/** 시스템 관리자용 — 마스터 비밀번호 평문 포함 */
+function toSystemFacility(row, lang = 'ko') {
+  return {
+    ...toPublicFacility(row, lang),
+    masterPassword: row.master_password || DEFAULT_MASTER_PASSWORD,
   };
 }
 
@@ -134,7 +145,7 @@ function mapType(t) {
 export const facilityService = {
   async listFacilities() {
     const rows = await facilityRepository.findAll();
-    return rows.map((r) => toPublicFacility(r));
+    return rows.map((r) => toSystemFacility(r));
   },
 
   async getPublicFacility(facilityCode, lang = 'ko') {
@@ -158,7 +169,7 @@ export const facilityService = {
   },
 
   async createFacility(input) {
-    if (!input.facilityCode || !input.name || !input.masterUsername || !input.masterPassword) {
+    if (!input.facilityCode || !input.name) {
       throw createError(400, '필수 항목을 모두 입력해 주세요.');
     }
     const unitCost = Number(input.kakaoUnitCost);
@@ -169,19 +180,36 @@ export const facilityService = {
     const exists = await facilityRepository.findByCode(input.facilityCode);
     if (exists) throw createError(409, '이미 사용 중인 시설사 코드입니다.');
 
-    requireStrongPassword(input.masterPassword, input.masterUsername);
-    const passwordHash = await bcrypt.hash(input.masterPassword, 10);
+    const facilityPassword =
+      String(input.facilityPassword || '').trim() || DEFAULT_FACILITY_PASSWORD;
+    const masterPassword =
+      String(input.masterPassword || '').trim() || DEFAULT_MASTER_PASSWORD;
+
+    requireStrongPassword(facilityPassword, input.facilityCode);
+    requireStrongPassword(masterPassword, input.facilityCode);
+
+    const facilityPasswordHash = await bcrypt.hash(facilityPassword, 10);
+    const masterPasswordHash = await bcrypt.hash(masterPassword, 10);
+
     const facility = await facilityRepository.create({
       facilityCode: input.facilityCode,
       name: input.name,
-      masterUsername: input.masterUsername,
-      passwordHash,
+      facilityPasswordHash,
+      masterPasswordHash,
+      masterPassword,
       kakaoUnitCost: unitCost,
       status,
     });
     await facilityRepository.createDefaults(facility.id);
+
+    if (Object.prototype.hasOwnProperty.call(input, 'adAreaEnabled')) {
+      await facilityRepository.updateSettings(facility.id, {
+        adAreaEnabled: !!input.adAreaEnabled,
+      });
+    }
+
     const created = await facilityRepository.findByCode(facility.facility_code);
-    return toPublicFacility(created);
+    return toSystemFacility(created);
   },
 
   async updateSettings(facilityCode, data) {
@@ -246,8 +274,9 @@ export const facilityService = {
       }
     }
 
+    // 광고 노출은 시스템 관리자만 변경 (시설 설정 API에서는 무시)
     if (Object.prototype.hasOwnProperty.call(data, 'adAreaEnabled')) {
-      data.adAreaEnabled = !!data.adAreaEnabled;
+      delete data.adAreaEnabled;
     }
 
     // profileImageUrl empty string means clear
@@ -286,7 +315,6 @@ export const facilityService = {
       name: data.name,
       kakaoUnitCost: data.kakaoUnitCost,
       status: data.status,
-      masterUsername: data.masterUsername,
     };
 
     if (data.kakaoUnitCost != null) {
@@ -304,17 +332,22 @@ export const facilityService = {
     }
 
     if (data.masterPassword != null && String(data.masterPassword).length > 0) {
-      const username =
-        data.masterUsername != null
-          ? data.masterUsername
-          : facility.master_username;
-      requireStrongPassword(String(data.masterPassword), username);
-      patch.masterPasswordHash = await bcrypt.hash(String(data.masterPassword), 10);
+      const plain = String(data.masterPassword);
+      requireStrongPassword(plain, facilityCode);
+      patch.masterPassword = plain;
+      patch.masterPasswordHash = await bcrypt.hash(plain, 10);
     }
 
     await facilityRepository.updateFacility(facility.id, patch);
+
+    if (Object.prototype.hasOwnProperty.call(data, 'adAreaEnabled')) {
+      await facilityRepository.updateSettings(facility.id, {
+        adAreaEnabled: !!data.adAreaEnabled,
+      });
+    }
+
     const updated = await facilityRepository.findByCode(facilityCode);
-    return toPublicFacility(updated);
+    return toSystemFacility(updated);
   },
 
   async listWaitingTypes(facilityCode) {

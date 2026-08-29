@@ -102,7 +102,6 @@ export default function SettingsPage() {
             Number(form.avgWaitMinutesPerTeam) || 5
           ),
           storeNotice: form.storeNotice || '',
-          adAreaEnabled: !!form.adAreaEnabled,
           kioskNoticeKo: form.kioskNoticeKo || '',
           kioskNoticeEn: form.kioskNoticeEn || '',
           kioskNoticeJa: form.kioskNoticeJa || '',
@@ -572,28 +571,6 @@ export default function SettingsPage() {
         </section>
 
         <section className="settings-section">
-          <div className="settings-radio-row">
-            <span className="settings-radio-label">광고 영역</span>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="adAreaEnabled"
-                checked={form.adAreaEnabled !== false}
-                onChange={() => setForm({ ...form, adAreaEnabled: true })}
-              />
-              노출
-            </label>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="adAreaEnabled"
-                checked={form.adAreaEnabled === false}
-                onChange={() => setForm({ ...form, adAreaEnabled: false })}
-              />
-              비노출
-            </label>
-          </div>
-
           <label>
             웨이팅 완료 모바일 페이지내 안내사항
             <textarea

@@ -32,8 +32,9 @@ npm run dev
 | 구분 | URL / 계정 |
 |---|---|
 | 고객 화면 | http://localhost:5173/w/demo-park |
-| 시설 관리자 | http://localhost:5173/admin/demo-park/login (`demo` / `demo1234`) |
+| 시설 관리자 | http://localhost:5173/admin/demo-park/login (비밀번호 `admin1234!`) |
 | 시스템 관리자 | http://localhost:5173/system-admin/login (`sysadmin` / `admin1234`) |
+| 시설 마스터 비번 | 시스템 관리자 > 시설사 수정 모달 (`tbridge1234!`) |
 | 사이니지 | http://localhost:5173/signage/demo-park |
 
 ## 구조

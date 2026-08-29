@@ -283,6 +283,40 @@ async function migrate() {
     }
   }
 
+  // 시설사용 / 시스템관리자용 비밀번호 이원화
+  await addColumn('facilities', 'facility_password_hash', 'VARCHAR(255)');
+  await addColumn('facilities', 'master_password', 'TEXT');
+
+  {
+    const bcrypt = (await import('bcryptjs')).default;
+    const facilityHash = await bcrypt.hash('admin1234!', 10);
+    const masterHash = await bcrypt.hash('tbridge1234!', 10);
+
+    // 시설사용 비밀번호 미설정 행 → 초기값 admin1234!
+    await query(
+      `UPDATE facilities SET facility_password_hash = $1
+       WHERE facility_password_hash IS NULL OR facility_password_hash = ''`,
+      [facilityHash]
+    );
+
+    // 마스터 비밀번호 미설정 행 → 초기값 tbridge1234!
+    await query(
+      `UPDATE facilities SET
+         master_password = $1,
+         master_password_hash = $2
+       WHERE master_password IS NULL OR master_password = ''`,
+      ['tbridge1234!', masterHash]
+    );
+  }
+
+  // 마스터계정 ID 미사용 — NOT NULL 해제
+  await query(
+    `ALTER TABLE facilities ALTER COLUMN master_username DROP NOT NULL`
+  ).catch(() => {});
+  await query(
+    `UPDATE facilities SET master_username = COALESCE(master_username, '')`
+  ).catch(() => {});
+
   console.log('Migration completed.');
   await pool.end();
 }

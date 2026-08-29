@@ -39,11 +39,11 @@ export const facilityRepository = {
     return rows[0] || null;
   },
 
-  async findByMasterUsername(facilityCode, username) {
+  async findActiveByCode(facilityCode) {
     const { rows } = await query(
       `SELECT * FROM facilities
-       WHERE facility_code = $1 AND master_username = $2 AND status = 'active'`,
-      [facilityCode, username]
+       WHERE facility_code = $1 AND status = 'active'`,
+      [facilityCode]
     );
     return rows[0] || null;
   },
@@ -51,18 +51,28 @@ export const facilityRepository = {
   async create({
     facilityCode,
     name,
-    masterUsername,
-    passwordHash,
+    facilityPasswordHash,
+    masterPasswordHash,
+    masterPassword,
     kakaoUnitCost = 20,
     status = 'active',
   }) {
     const { rows } = await query(
       `INSERT INTO facilities (
-         facility_code, name, master_username, master_password_hash,
+         facility_code, name, master_username,
+         facility_password_hash, master_password_hash, master_password,
          kakao_unit_cost, status, kakao_balance
-       ) VALUES ($1, $2, $3, $4, $5, $6, 0)
+       ) VALUES ($1, $2, '', $3, $4, $5, $6, $7, 0)
        RETURNING *`,
-      [facilityCode, name, masterUsername, passwordHash, kakaoUnitCost, status]
+      [
+        facilityCode,
+        name,
+        facilityPasswordHash,
+        masterPasswordHash,
+        masterPassword,
+        kakaoUnitCost,
+        status,
+      ]
     );
     return rows[0];
   },
@@ -176,8 +186,9 @@ export const facilityRepository = {
          kakao_warning_threshold = COALESCE($5, kakao_warning_threshold),
          admin_contact = COALESCE($6, admin_contact),
          status = COALESCE($7, status),
-         master_username = COALESCE($8, master_username),
-         master_password_hash = COALESCE($9, master_password_hash),
+         master_password_hash = COALESCE($8, master_password_hash),
+         facility_password_hash = COALESCE($9, facility_password_hash),
+         master_password = COALESCE($10, master_password),
          updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
@@ -189,8 +200,9 @@ export const facilityRepository = {
         data.kakaoWarningThreshold ?? null,
         data.adminContact ?? null,
         data.status ?? null,
-        data.masterUsername ?? null,
         data.masterPasswordHash ?? null,
+        data.facilityPasswordHash ?? null,
+        data.masterPassword ?? null,
       ]
     );
     return rows[0];

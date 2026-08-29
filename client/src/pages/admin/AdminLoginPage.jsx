@@ -7,8 +7,7 @@ export default function AdminLoginPage() {
   const { facilityCode } = useParams();
   const navigate = useNavigate();
   const { loginFacility } = useAuth();
-  const [username, setUsername] = useState('demo');
-  const [password, setPassword] = useState('demo1234');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +18,7 @@ export default function AdminLoginPage() {
     try {
       const result = await api(`/admin/${facilityCode}/login`, {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ password }),
       });
       loginFacility(result.token, result.user);
       navigate(`/admin/${facilityCode}/waiting`);
@@ -39,15 +38,13 @@ export default function AdminLoginPage() {
         <h1>시설사 관리자 로그인</h1>
         <p className="muted">시설 코드: {facilityCode}</p>
         <label>
-          아이디
-          <input value={username} onChange={(e) => setUsername(e.target.value)} />
-        </label>
-        <label>
           비밀번호
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
           />
         </label>
         {error && <p className="form-error">{error}</p>}

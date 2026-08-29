@@ -9,11 +9,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 import { validatePassword } from '../../utils/passwordPolicy';
 
+const DEFAULT_MASTER_PASSWORD = 'tbridge1234!';
+
 const emptyForm = {
   name: '',
   facilityCode: '',
-  masterUsername: '',
-  masterPassword: '',
+  masterPassword: DEFAULT_MASTER_PASSWORD,
+  adAreaEnabled: true,
   kakaoUnitCost: '20',
   status: 'active',
 };
@@ -22,8 +24,8 @@ function snapshotOf(form) {
   return JSON.stringify({
     name: form.name,
     facilityCode: form.facilityCode,
-    masterUsername: form.masterUsername,
     masterPassword: form.masterPassword,
+    adAreaEnabled: form.adAreaEnabled !== false,
     kakaoUnitCost: String(form.kakaoUnitCost ?? ''),
     status: form.status,
   });
@@ -91,7 +93,7 @@ export default function FacilitiesPage() {
 
   const openCreate = () => {
     setMode('create');
-    setForm(emptyForm);
+    setForm({ ...emptyForm, masterPassword: DEFAULT_MASTER_PASSWORD });
     setInitialSnapshot('');
     setOpen(true);
   };
@@ -100,8 +102,8 @@ export default function FacilitiesPage() {
     const next = {
       name: facility.name || '',
       facilityCode: facility.facilityCode || '',
-      masterUsername: facility.masterUsername || '',
-      masterPassword: '',
+      masterPassword: facility.masterPassword || DEFAULT_MASTER_PASSWORD,
+      adAreaEnabled: facility.adAreaEnabled !== false,
       kakaoUnitCost: String(facility.kakaoUnitCost ?? 20),
       status: facility.status === 'withdraw' || facility.status === 'inactive' ? 'withdraw' : 'active',
     };
@@ -114,17 +116,21 @@ export default function FacilitiesPage() {
   const submit = async (e) => {
     e.preventDefault();
     if (mode === 'edit' && !dirty) return;
-    const needsPasswordCheck =
-      mode === 'create' || String(form.masterPassword || '').length > 0;
-    if (needsPasswordCheck) {
-      const check = validatePassword(form.masterPassword, {
-        username: form.masterUsername,
+
+    const masterPwd = String(form.masterPassword || '').trim();
+    if (masterPwd) {
+      const check = validatePassword(masterPwd, {
+        username: form.facilityCode,
       });
       if (!check.valid) {
         showToast(check.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
         return;
       }
+    } else if (mode === 'create') {
+      showToast('마스터계정 비밀번호를 입력해 주세요.');
+      return;
     }
+
     try {
       if (mode === 'create') {
         const created = await api(
@@ -132,8 +138,12 @@ export default function FacilitiesPage() {
           {
             method: 'POST',
             body: JSON.stringify({
-              ...form,
+              name: form.name,
+              facilityCode: form.facilityCode,
+              masterPassword: masterPwd || DEFAULT_MASTER_PASSWORD,
+              adAreaEnabled: form.adAreaEnabled !== false,
               kakaoUnitCost: Number(form.kakaoUnitCost),
+              status: form.status,
             }),
           },
           'system'
@@ -144,21 +154,17 @@ export default function FacilitiesPage() {
         return;
       }
 
-      const body = {
-        name: form.name,
-        masterUsername: form.masterUsername,
-        kakaoUnitCost: Number(form.kakaoUnitCost),
-        status: form.status,
-      };
-      if (form.masterPassword) {
-        body.masterPassword = form.masterPassword;
-      }
-
       await api(
         `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}`,
         {
           method: 'PUT',
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            name: form.name,
+            masterPassword: masterPwd,
+            adAreaEnabled: form.adAreaEnabled !== false,
+            kakaoUnitCost: Number(form.kakaoUnitCost),
+            status: form.status,
+          }),
         },
         'system'
       );
@@ -198,51 +204,22 @@ export default function FacilitiesPage() {
                 <th>사용자 화면</th>
                 <th>관리자 화면</th>
                 <th>사이니지</th>
-                <th>카카오 알림톡 발송 비용</th>
-                <th>등록일시</th>
+                <th>알림톡 단가</th>
+                <th>등록일</th>
                 <th>상태</th>
               </tr>
             </thead>
             <tbody>
               {facilities.map((f) => (
-                <tr key={f.id}>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(f)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        margin: 0,
-                        color: 'inherit',
-                        font: 'inherit',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {f.name}
-                    </button>
-                  </td>
+                <tr key={f.id || f.facilityCode} onClick={() => openEdit(f)}>
+                  <td>{f.name}</td>
                   <td>{f.facilityCode}</td>
-                  <td>
-                    <a href={f.links.customer} target="_blank" rel="noreferrer">
-                      {f.links.customer}
-                    </a>
-                  </td>
-                  <td>
-                    <a href={f.links.admin} target="_blank" rel="noreferrer">
-                      {f.links.admin}
-                    </a>
-                  </td>
-                  <td>
-                    <a href={f.links.signage} target="_blank" rel="noreferrer">
-                      {f.links.signage}
-                    </a>
-                  </td>
+                  <td>{f.links?.customer || `/w/${f.facilityCode}`}</td>
+                  <td>{f.links?.admin || `/admin/${f.facilityCode}/login`}</td>
+                  <td>{f.links?.signage || `/signage/${f.facilityCode}`}</td>
                   <td>{Number(f.kakaoUnitCost || 0).toLocaleString()}원</td>
                   <td>{formatDateTime(f.createdAt)}</td>
-                  <td>{f.statusLabel || (f.status === 'withdraw' ? '탈퇴' : '활성')}</td>
+                  <td>{f.statusLabel || f.status}</td>
                 </tr>
               ))}
             </tbody>
@@ -278,30 +255,45 @@ export default function FacilitiesPage() {
                 />
               </label>
               <label>
-                마스터계정 ID
-                <input
-                  value={form.masterUsername}
-                  onChange={(e) => setForm({ ...form, masterUsername: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
                 마스터계정 비밀번호
                 <input
-                  type="password"
+                  type="text"
                   value={form.masterPassword}
                   onChange={(e) => setForm({ ...form, masterPassword: e.target.value })}
                   required={mode === 'create'}
-                  placeholder={mode === 'edit' ? '변경 시에만 입력' : undefined}
-                  autoComplete={mode === 'edit' ? 'new-password' : 'off'}
+                  autoComplete="off"
                 />
-                {(mode === 'create' || form.masterPassword) && (
-                  <PasswordChecklist
-                    password={form.masterPassword}
-                    username={form.masterUsername}
-                  />
+                <PasswordChecklist
+                  password={form.masterPassword}
+                  username={form.facilityCode}
+                />
+                {mode === 'create' && (
+                  <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                    시설사용 비밀번호 초기값: admin1234! (시설 설정에서 변경)
+                  </p>
                 )}
               </label>
+              <div className="settings-radio-row" style={{ marginBottom: 12 }}>
+                <span className="settings-radio-label">웨이팅 등록 완료 페이지 광고 노출</span>
+                <label className="settings-radio">
+                  <input
+                    type="radio"
+                    name="adAreaEnabled"
+                    checked={form.adAreaEnabled !== false}
+                    onChange={() => setForm({ ...form, adAreaEnabled: true })}
+                  />
+                  활성화
+                </label>
+                <label className="settings-radio">
+                  <input
+                    type="radio"
+                    name="adAreaEnabled"
+                    checked={form.adAreaEnabled === false}
+                    onChange={() => setForm({ ...form, adAreaEnabled: false })}
+                  />
+                  비활성화
+                </label>
+              </div>
               <label>
                 카카오 알림톡 발송 비용
                 <input
