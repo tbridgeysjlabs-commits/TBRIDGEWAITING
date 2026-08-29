@@ -5,9 +5,21 @@ import {
   formatTimeKst,
 } from '../utils/datetime.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL
-  ? `${import.meta.env.VITE_API_BASE_URL}/api`
-  : '/api';
+const API_ORIGIN = import.meta.env.VITE_API_BASE_URL
+  ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/$/, '')
+  : '';
+
+const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api';
+
+/** `/uploads/...` → 브라우저가 API 서버에서 이미지를 받도록 절대/상대 URL 정규화 */
+export function mediaUrl(path) {
+  if (!path) return '';
+  const raw = String(path).trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return API_ORIGIN ? `${API_ORIGIN}${normalized}` : normalized;
+}
 
 function getToken(scope = 'facility') {
   if (scope === 'system') return localStorage.getItem('tb_system_token');

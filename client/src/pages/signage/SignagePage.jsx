@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, formatTime } from '../../api/client';
+import { api, formatTime, mediaUrl } from '../../api/client';
 import { toKstClockParts } from '../../utils/datetime.js';
 import styles from './SignagePage.module.css';
 
@@ -156,7 +156,7 @@ export default function SignagePage() {
   );
   const isCalling = Boolean(activeCall);
   const name = facility.name || '{ 시설사명 }';
-  const logoUrl = facility.profileImageUrl;
+  const logoUrl = mediaUrl(facility.profileImageUrl);
   const brandMode = 'image_text';
 
   return (

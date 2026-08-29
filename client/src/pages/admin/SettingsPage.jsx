@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import PasswordChangeModal from '../../components/PasswordChangeModal';
@@ -334,6 +334,14 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      showToast('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    if (/heic|heif|avif/i.test(file.type) || /\.(heic|heif|avif)$/i.test(file.name)) {
+      showToast('HEIC/AVIF 형식은 지원하지 않습니다. JPG 또는 PNG로 변환해 주세요.');
+      return;
+    }
     try {
       const fd = new FormData();
       fd.append('image', file);
@@ -341,7 +349,13 @@ export default function SettingsPage() {
         method: 'POST',
         body: fd,
       });
-      setForm((f) => ({ ...f, profileImageUrl: updated.profileImageUrl || '' }));
+      const url = updated.profileImageUrl || '';
+      if (!url) {
+        showToast('이미지 URL을 받지 못했습니다. 다시 시도해 주세요.');
+        return;
+      }
+      setForm((f) => ({ ...f, profileImageUrl: url }));
+      showToast('이미지가 업로드되었습니다.');
     } catch (err) {
       showToast(err.message);
     }
@@ -454,7 +468,7 @@ export default function SettingsPage() {
             </label>
             {form.profileImageUrl ? (
               <div className="settings-image-preview">
-                <img src={form.profileImageUrl} alt="시설사" />
+                <img src={mediaUrl(form.profileImageUrl)} alt="시설사" />
                 <button type="button" className="img-remove" onClick={clearImage} aria-label="이미지 제거">
                   <AdminCloseIcon />
                 </button>

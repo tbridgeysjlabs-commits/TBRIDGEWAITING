@@ -9,8 +9,19 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const upload = createImageUpload(UPLOAD_DIR);
+const uploadSingle = upload.single('image');
 
-export const uploadFacilityImage = upload.single('image');
+/** multer 에러를 JSON 응답으로 변환 */
+export function uploadFacilityImage(req, res, next) {
+  uploadSingle(req, res, (err) => {
+    if (!err) return next();
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? '이미지 크기는 5MB 이하여야 합니다.'
+        : err.message || '이미지 업로드에 실패했습니다.';
+    return res.status(400).json({ message });
+  });
+}
 
 export const facilityController = {
   async list(req, res, next) {

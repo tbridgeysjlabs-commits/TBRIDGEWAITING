@@ -6,10 +6,11 @@ import { PrimaryButton } from '../../components/customer/ActionButtons';
 const DEFAULT_PANEL =
   'flex h-full w-full max-w-[min(690px,100%)] flex-col justify-between px-[clamp(1rem,2.8vw,2.75rem)] py-[clamp(0.75rem,2.2vh,2.25rem)]';
 
-/** 접두사 3자리 제외 나머지 7자리 → 3-3-4 / 8자리 → 3-4-4. 초기값 010 → "010-" */
+/** 전화번호 표시. 빈 값이면 빈 문자열(지우기로 전부 삭제 가능). */
 function displayPhone(digits) {
   const raw = (digits || '').replace(/\D/g, '').slice(0, 11);
-  if (!raw || raw.length <= 3) return `${raw || '010'}-`;
+  if (!raw) return '';
+  if (raw.length <= 3) return `${raw}-`;
 
   const prefix = raw.slice(0, 3);
   const rest = raw.slice(3);
@@ -45,8 +46,7 @@ export default function HomePage() {
       return;
     }
     if (key === 'back') {
-      const next = digits.slice(0, -1);
-      setPhone(next.length < 3 ? '010' : next);
+      setPhone(digits.slice(0, -1));
       return;
     }
     if (digits.length >= 11) return;
@@ -59,7 +59,7 @@ export default function HomePage() {
     >
       <div className="w-full shrink-0 py-[clamp(0.35rem,1.1vh,0.95rem)]">
         <div className="w-full text-center text-[clamp(1.65rem,4.6vh,3.55rem)] font-extrabold leading-tight tracking-wide text-[var(--cw-text,#fff)]">
-          {displayPhone(digits)}
+          {displayPhone(digits) || '\u00A0'}
         </div>
         <p className="mt-[clamp(0.3rem,1vh,0.9rem)] w-full text-center text-[clamp(0.8rem,1.95vh,1.35rem)] text-[var(--cw-text-muted,#9CA3AF)]">
           {t('phone_hint')}

@@ -1,13 +1,16 @@
+import { mediaUrl } from '../../../api/client';
+
 export default function CompleteFacilityInfo({
   name,
   imageUrl,
   registeredLabel,
 }) {
+  const src = mediaUrl(imageUrl);
   return (
     <section className="mb-6 flex w-full max-w-full flex-col items-center text-center sm:mb-8">
       <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-[var(--cw-panel-alt,#e5e7eb)] text-sm text-[var(--cw-text-muted,#9ca3af)] sm:mb-4 sm:h-20 sm:w-20">
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        {src ? (
+          <img src={src} alt="" className="h-full w-full object-cover" />
         ) : (
           'img'
         )}

@@ -78,11 +78,19 @@ export function createImageUpload(uploadDir) {
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       const mime = String(file.mimetype || '').toLowerCase();
-      if (MIME_EXT[mime] || mime.startsWith('image/')) {
+      if (
+        mime.includes('heic') ||
+        mime.includes('heif') ||
+        mime.includes('avif')
+      ) {
+        cb(new Error('HEIC/AVIF 형식은 지원하지 않습니다. JPG 또는 PNG로 변환해 주세요.'));
+        return;
+      }
+      if (MIME_EXT[mime] || mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/gif' || mime === 'image/webp') {
         cb(null, true);
         return;
       }
-      cb(new Error('이미지 파일만 업로드할 수 있습니다.'));
+      cb(new Error('JPG, PNG, GIF, WEBP 이미지만 업로드할 수 있습니다.'));
     },
   });
 }
