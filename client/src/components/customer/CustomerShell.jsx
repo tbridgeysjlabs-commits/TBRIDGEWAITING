@@ -19,7 +19,7 @@ function FacilityBrand({ facility }) {
     <div className="flex w-full shrink-0 items-center gap-[clamp(0.75rem,1.5vw,1.25rem)] rounded-[clamp(0.9rem,1.8vh,1.5rem)] border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-panel,#1A1A24)] px-[clamp(0.9rem,2vw,1.5rem)] py-[clamp(0.7rem,1.6vh,1.15rem)]">
       <div className="flex aspect-square h-[clamp(3rem,6vh,4.5rem)] w-[clamp(3rem,6vh,4.5rem)] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--cw-panel-alt,#f3f3f3)] text-xs text-[var(--cw-text-muted,#9ca3af)]">
         {img ? (
-          <img src={img} alt="" className="h-full w-full object-cover" />
+          <img src={img} alt="" className="h-full w-full object-contain" />
         ) : (
           'logo'
         )}

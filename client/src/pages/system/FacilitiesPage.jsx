@@ -229,7 +229,7 @@ export default function FacilitiesPage() {
         {open && (
           <div className="modal-backdrop" onClick={requestClose}>
             <form
-              className="modal-card"
+              className="modal-card facility-edit-modal"
               onClick={(e) => e.stopPropagation()}
               onSubmit={submit}
             >

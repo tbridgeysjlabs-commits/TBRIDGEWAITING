@@ -126,6 +126,12 @@ router.post(
   uploadFacilityImage,
   facilityController.uploadImage
 );
+router.delete(
+  '/admin/:facilityCode/settings/image',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  facilityController.deleteImage
+);
 router.get(
   '/admin/:facilityCode/customers',
   requireAuth(['facility_admin', 'system_admin']),

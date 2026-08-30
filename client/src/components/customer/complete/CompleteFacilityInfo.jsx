@@ -10,7 +10,7 @@ export default function CompleteFacilityInfo({
     <section className="mb-6 flex w-full max-w-full flex-col items-center text-center sm:mb-8">
       <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-[var(--cw-panel-alt,#e5e7eb)] text-sm text-[var(--cw-text-muted,#9ca3af)] sm:mb-4 sm:h-20 sm:w-20">
         {src ? (
-          <img src={src} alt="" className="h-full w-full object-cover" />
+          <img src={src} alt="" className="h-full w-full object-contain" />
         ) : (
           'img'
         )}

@@ -79,6 +79,8 @@ export default function SettingsPage() {
         method: 'PUT',
         body: JSON.stringify({
           ...form,
+          // 이미지는 업로드/삭제 API로만 관리 — 설정 저장 시 덮어쓰지 않음
+          profileImageUrl: undefined,
           enabledLanguages: enabledLangs.includes('ko')
             ? enabledLangs
             : ['ko', ...enabledLangs],
@@ -175,7 +177,7 @@ export default function SettingsPage() {
         ...form,
         name: updated.name,
         adminContact: updated.adminContact || form.adminContact,
-        profileImageUrl: updated.profileImageUrl || '',
+        profileImageUrl: form.profileImageUrl || updated.profileImageUrl || '',
         kakaoWarningThreshold:
           updated.kakaoWarningThreshold ?? form.kakaoWarningThreshold,
         entryWaitMinutes: updated.entryWaitMinutes ?? form.entryWaitMinutes,
@@ -353,14 +355,48 @@ export default function SettingsPage() {
         showToast('이미지 URL을 받지 못했습니다. 다시 시도해 주세요.');
         return;
       }
-      setForm((f) => ({ ...f, profileImageUrl: url }));
+      setForm((f) => {
+        const next = { ...f, profileImageUrl: url };
+        setSavedSnapshot((prev) => {
+          if (!prev) return prev;
+          try {
+            const parsed = JSON.parse(prev);
+            parsed.form = { ...parsed.form, profileImageUrl: url };
+            return JSON.stringify(parsed);
+          } catch {
+            return prev;
+          }
+        });
+        return next;
+      });
       showToast('이미지가 업로드되었습니다.');
     } catch (err) {
       showToast(err.message);
     }
   };
 
-  const clearImage = () => setForm((f) => ({ ...f, profileImageUrl: '' }));
+  const clearImage = async () => {
+    try {
+      await api(`/admin/${facilityCode}/settings/image`, { method: 'DELETE' });
+      setForm((f) => {
+        const next = { ...f, profileImageUrl: '' };
+        setSavedSnapshot((prev) => {
+          if (!prev) return prev;
+          try {
+            const parsed = JSON.parse(prev);
+            parsed.form = { ...parsed.form, profileImageUrl: '' };
+            return JSON.stringify(parsed);
+          } catch {
+            return prev;
+          }
+        });
+        return next;
+      });
+      showToast('이미지가 삭제되었습니다.');
+    } catch (err) {
+      showToast(err.message);
+    }
+  };
 
   const addType = () => setTypes((prev) => [...prev, emptyType()]);
 
@@ -399,9 +435,6 @@ export default function SettingsPage() {
 
   if (!form) return <div className="center-page">Loading...</div>;
 
-  const isWideBrand = false;
-  const imageRatioLabel = '1:1';
-
   return (
     <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
@@ -415,7 +448,10 @@ export default function SettingsPage() {
         }}
       />
       <main className="admin-main settings-main">
-        <h1>설정</h1>
+        <header className="settings-page-header">
+          <h1>설정</h1>
+          <p>시설 정보, 대기 운영 규칙, 안내 문구를 관리합니다</p>
+        </header>
 
         {kakaoAlimtalkMode === 'mock' && (
           <div className="admin-alert admin-alert-warn" role="status">
@@ -427,250 +463,266 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <section className="settings-section">
-          <label>
-            시설사명
-            <input
-              placeholder="시설사명 입력"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-
-          <div className="settings-radio-row">
-            <span className="settings-radio-label">테마 선택</span>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="theme"
-                checked={form.theme === 'light'}
-                onChange={() => setForm({ ...form, theme: 'light' })}
-              />
-              라이트 테마
-            </label>
-            <label className="settings-radio">
-              <input
-                type="radio"
-                name="theme"
-                checked={form.theme === 'dark'}
-                onChange={() => setForm({ ...form, theme: 'dark' })}
-              />
-              다크 테마
-            </label>
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <h2>시설 정보</h2>
           </div>
+          <div className="settings-card-body">
+            <div className="settings-field-row">
+              <span className="settings-field-label">시설사명</span>
+              <input
+                placeholder="시설사명 입력"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
 
-          <div className="settings-image-row">
-            <span>시설사 표시 (작은 이미지 + 텍스트)</span>
-            <label className="btn-search file-btn">
-              이미지 찾기
-              <input type="file" accept="image/*" hidden onChange={uploadImage} />
-            </label>
-            {form.profileImageUrl ? (
-              <div className="settings-image-preview">
-                <img src={mediaUrl(form.profileImageUrl)} alt="시설사" />
-                <button type="button" className="img-remove" onClick={clearImage} aria-label="이미지 제거">
-                  <AdminCloseIcon />
+            <div className="settings-field-row">
+              <span className="settings-field-label">테마 선택</span>
+              <div className="settings-choice-group">
+                <button
+                  type="button"
+                  className={`settings-choice ${form.theme === 'light' ? 'active' : ''}`}
+                  onClick={() => setForm({ ...form, theme: 'light' })}
+                >
+                  라이트 테마
+                </button>
+                <button
+                  type="button"
+                  className={`settings-choice ${form.theme === 'dark' ? 'active' : ''}`}
+                  onClick={() => setForm({ ...form, theme: 'dark' })}
+                >
+                  다크 테마
                 </button>
               </div>
-            ) : (
-              <div className="settings-image-placeholder">IMG</div>
-            )}
-            <input
-              className="settings-brand-text"
-              placeholder="텍스트 입력"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-
-          <label>
-            관리자 연락처
-            <input
-              placeholder="연락처 입력"
-              value={form.adminContact}
-              onChange={(e) => setForm({ ...form, adminContact: e.target.value })}
-            />
-          </label>
-
-          <div className="settings-dual-row">
-            <label>
-              충전 필요 알림 금액
-              <div className="inline-unit">
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="금액 입력"
-                  value={form.kakaoWarningThreshold}
-                  onChange={(e) =>
-                    setForm({ ...form, kakaoWarningThreshold: e.target.value })
-                  }
-                />
-                <span>원</span>
-              </div>
-            </label>
-            <label>
-              입장 대기 알림 순번 설정
-              <div className="inline-unit">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={form.waitingNotificationOrder}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === '') {
-                      setForm({ ...form, waitingNotificationOrder: '' });
-                      return;
-                    }
-                    const n = Number(v);
-                    if (!Number.isFinite(n)) return;
-                    setForm({
-                      ...form,
-                      waitingNotificationOrder: Math.max(1, Math.floor(n)),
-                    });
-                  }}
-                />
-                <span>번</span>
-              </div>
-            </label>
-          </div>
-          <div className="settings-dual-row">
-            <label>
-              입장 대기 시간 설정
-              <div className="inline-unit">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="분 입력"
-                  value={form.entryWaitMinutes}
-                  onChange={(e) =>
-                    setForm({ ...form, entryWaitMinutes: e.target.value })
-                  }
-                />
-                <span>분</span>
-              </div>
-            </label>
-            <label>
-              1팀당 입장 예상 시간 설정
-              <div className="inline-unit">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="분 입력"
-                  value={form.avgWaitMinutesPerTeam}
-                  onChange={(e) =>
-                    setForm({ ...form, avgWaitMinutesPerTeam: e.target.value })
-                  }
-                />
-                <span>분</span>
-              </div>
-            </label>
-          </div>
-        </section>
-
-        <section className="settings-section">
-          <label>
-            웨이팅 완료 모바일 페이지내 안내사항
-            <textarea
-              rows={5}
-              placeholder="웨이팅 완료 모바일 페이지내 안내사항 입력"
-              value={form.storeNotice || ''}
-              onChange={(e) => setForm({ ...form, storeNotice: e.target.value })}
-            />
-          </label>
-        </section>
-
-        <section className="settings-section">
-          <h2>미루기 처리 방법</h2>
-          <div className="postpone-policy-group">
-            {[
-              { key: 'none', label: '미루기 없음' },
-              { key: 'select_position', label: '선택한 순서로 미루기' },
-              { key: 'last_position', label: '마지막 순서로 미루기' },
-            ].map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                className={`chip ${form.postponePolicy === opt.key ? 'active' : ''}`}
-                onClick={() => setForm({ ...form, postponePolicy: opt.key })}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          {form.postponePolicy !== 'none' && (
-            <div className="postpone-limit-box">
-              <span>미루기 허용 횟수</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    postponeLimit: Math.max(1, Number(form.postponeLimit) - 1),
-                  })
-                }
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min="1"
-                value={form.postponeLimit}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    postponeLimit: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setForm({ ...form, postponeLimit: Number(form.postponeLimit) + 1 })
-                }
-              >
-                +
-              </button>
             </div>
-          )}
 
-          <h2 style={{ marginTop: 20 }}>다국어 선택</h2>
-          <div className="postpone-policy-group">
-            {TOGGLE_LANGS.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                className={`chip round ${enabledLangs.includes(lang.code) ? 'active' : ''}`}
-                onClick={() => toggleLang(lang.code)}
-              >
-                {lang.label}
-              </button>
-            ))}
+            <div className="settings-field-row settings-field-row-start">
+              <span className="settings-field-label">
+                시설사 표시
+                <span className="settings-field-hint">키오스크 이미지 + 텍스트</span>
+              </span>
+              <div className="settings-brand-controls">
+                {form.profileImageUrl ? (
+                  <div className="settings-image-preview">
+                    <img src={mediaUrl(form.profileImageUrl)} alt="시설사" />
+                    <button
+                      type="button"
+                      className="img-remove"
+                      onClick={() => clearImage().catch(() => {})}
+                      aria-label="이미지 제거"
+                    >
+                      <AdminCloseIcon />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="settings-image-placeholder">로고</div>
+                )}
+                <label className="btn-search file-btn settings-file-btn">
+                  이미지 찾기
+                  <input type="file" accept="image/*" hidden onChange={uploadImage} />
+                </label>
+                <input
+                  className="settings-brand-text"
+                  placeholder="텍스트 입력"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="settings-field-row">
+              <span className="settings-field-label">관리자 연락처</span>
+              <input
+                placeholder="연락처 입력"
+                value={form.adminContact}
+                onChange={(e) => setForm({ ...form, adminContact: e.target.value })}
+              />
+            </div>
           </div>
         </section>
 
-        <section className="settings-section">
-          <div className="section-head">
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <h2>대기 운영</h2>
+          </div>
+          <div className="settings-card-body">
+            <div className="settings-op-row">
+              <div className="settings-op-field">
+                <label>충전 필요 알림 금액</label>
+                <div className="inline-unit">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="금액 입력"
+                    value={form.kakaoWarningThreshold}
+                    onChange={(e) =>
+                      setForm({ ...form, kakaoWarningThreshold: e.target.value })
+                    }
+                  />
+                  <span>원</span>
+                </div>
+              </div>
+              <div className="settings-op-field">
+                <label>입장 대기 알림 순번 설정</label>
+                <div className="inline-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.waitingNotificationOrder}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') {
+                        setForm({ ...form, waitingNotificationOrder: '' });
+                        return;
+                      }
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+                      setForm({
+                        ...form,
+                        waitingNotificationOrder: Math.max(1, Math.floor(n)),
+                      });
+                    }}
+                  />
+                  <span>번</span>
+                </div>
+              </div>
+              <div className="settings-op-field">
+                <label>입장 대기 시간 설정</label>
+                <div className="inline-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="분 입력"
+                    value={form.entryWaitMinutes}
+                    onChange={(e) =>
+                      setForm({ ...form, entryWaitMinutes: e.target.value })
+                    }
+                  />
+                  <span>분</span>
+                </div>
+              </div>
+              <div className="settings-op-field">
+                <label>1팀당 입장 예상 시간 설정</label>
+                <div className="inline-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="분 입력"
+                    value={form.avgWaitMinutesPerTeam}
+                    onChange={(e) =>
+                      setForm({ ...form, avgWaitMinutesPerTeam: e.target.value })
+                    }
+                  />
+                  <span>분</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-op-block">
+              <label>웨이팅 완료 모바일 웹 이미지 안내사항</label>
+              <textarea
+                rows={4}
+                placeholder="웨이팅 완료 모바일 페이지내 안내사항 입력"
+                value={form.storeNotice || ''}
+                onChange={(e) => setForm({ ...form, storeNotice: e.target.value })}
+              />
+            </div>
+
+            <div className="settings-op-inline">
+              <div className="settings-op-block">
+                <label>미루기 처리 방법</label>
+                <div className="settings-choice-group wrap">
+                  {[
+                    { key: 'none', label: '미루기 없음' },
+                    { key: 'select_position', label: '선택한 순서로 미루기' },
+                    { key: 'last_position', label: '마지막 순서로 미루기' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      className={`settings-choice ${form.postponePolicy === opt.key ? 'active' : ''}`}
+                      onClick={() => setForm({ ...form, postponePolicy: opt.key })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {form.postponePolicy !== 'none' && (
+                <div className="settings-op-block">
+                  <label>미루기 허용 횟수</label>
+                  <div className="settings-stepper">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          postponeLimit: Math.max(1, Number(form.postponeLimit) - 1),
+                        })
+                      }
+                    >
+                      −
+                    </button>
+                    <span>{form.postponeLimit}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          postponeLimit: Number(form.postponeLimit) + 1,
+                        })
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="settings-op-block">
+              <label>다국어 선택</label>
+              <div className="settings-choice-group wrap">
+                {TOGGLE_LANGS.map((lang) => (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    className={`settings-choice round ${enabledLangs.includes(lang.code) ? 'active' : ''}`}
+                    onClick={() => toggleLang(lang.code)}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-head settings-card-head-row">
             <h2>대기 권종</h2>
-            <button type="button" className="btn-search" onClick={addType}>
+            <button type="button" className="settings-add-btn" onClick={addType}>
               + 추가
             </button>
           </div>
-          <div className="type-list">
+          <div className="settings-card-body settings-type-body">
             {types.map((type, index) => (
               <div
                 key={type.id}
-                className="type-item multi"
+                className="settings-type-item"
                 draggable
                 onDragStart={() => setDragIndex(index)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDrop(index)}
               >
                 {activeLangFields.map((lang) => (
-                  <label key={lang.key}>
-                    {lang.label}
+                  <label key={lang.key} className="settings-type-lang">
+                    <span>{lang.label}</span>
                     <input
                       value={type[`name${lang.key}`] || ''}
                       onChange={(e) => {
@@ -685,11 +737,11 @@ export default function SettingsPage() {
                   </label>
                 ))}
                 <button type="button" className="drag-handle" title="순서 변경">
-                  ⇅
+                  ↕
                 </button>
                 <button
                   type="button"
-                  className="btn-ghost"
+                  className="settings-type-delete"
                   disabled={types.length <= 1}
                   onClick={() => removeType(type.id)}
                 >
@@ -700,40 +752,46 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="settings-section">
-          <h2>공지사항 설정</h2>
-          <div className="term-lang-block">
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <h2>공지사항 설정</h2>
+          </div>
+          <div className="settings-card-body">
             {activeLangFields.map((lang) => (
-              <div key={`notice-${lang.key}`} className="term-lang-group">
-                <h3>{lang.label}</h3>
-                <label>
-                  키오스크 공지사항
-                  <textarea
-                    rows={5}
-                    placeholder="공지사항 본문을 입력해 주세요"
-                    value={form[`kioskNotice${lang.key}`] || ''}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        [`kioskNotice${lang.key}`]: e.target.value,
-                      })
-                    }
-                  />
-                </label>
+              <div key={`notice-${lang.key}`} className="settings-term-group">
+                <div className="settings-term-title">
+                  <span className="settings-lang-pill">{lang.label}</span>
+                  <span>키오스크 공지사항</span>
+                </div>
+                <textarea
+                  rows={6}
+                  placeholder="공지사항 본문을 입력해 주세요"
+                  value={form[`kioskNotice${lang.key}`] || ''}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      [`kioskNotice${lang.key}`]: e.target.value,
+                    })
+                  }
+                />
               </div>
             ))}
           </div>
         </section>
 
-        <section className="settings-section">
-          <h2>약관</h2>
-          <div className="term-lang-block">
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <h2>약관</h2>
+          </div>
+          <div className="settings-card-body">
             {activeLangFields.map((lang) => (
-              <div key={lang.key} className="term-lang-group">
+              <div key={lang.key} className="settings-term-group">
                 <h3>{lang.label}</h3>
-
-                <label>
-                  1. 이용약관 동의 (필수)
+                <div className="settings-term-block">
+                  <div className="settings-term-title">
+                    <span>1. 이용약관 동의</span>
+                    <span className="settings-badge required">필수</span>
+                  </div>
                   <textarea
                     rows={5}
                     placeholder="이용약관 본문을 입력해 주세요"
@@ -742,10 +800,12 @@ export default function SettingsPage() {
                       setForm({ ...form, [`terms${lang.key}`]: e.target.value })
                     }
                   />
-                </label>
-
-                <label>
-                  2. 개인정보 수집·이용 동의 (필수)
+                </div>
+                <div className="settings-term-block">
+                  <div className="settings-term-title">
+                    <span>2. 개인정보 수집·이용 동의</span>
+                    <span className="settings-badge required">필수</span>
+                  </div>
                   <textarea
                     rows={5}
                     placeholder="개인정보 수집·이용 동의 본문을 입력해 주세요"
@@ -754,10 +814,12 @@ export default function SettingsPage() {
                       setForm({ ...form, [`privacy${lang.key}`]: e.target.value })
                     }
                   />
-                </label>
-
-                <label>
-                  3. 마케팅 정보 수신 동의 (선택)
+                </div>
+                <div className="settings-term-block">
+                  <div className="settings-term-title">
+                    <span>3. 마케팅 정보 수신 동의</span>
+                    <span className="settings-badge optional">선택</span>
+                  </div>
                   <textarea
                     rows={5}
                     placeholder="마케팅 정보 수신 동의 본문을 입력해 주세요"
@@ -769,31 +831,36 @@ export default function SettingsPage() {
                       })
                     }
                   />
-                </label>
+                </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="settings-section">
-          <h2>비밀번호 변경</h2>
+        <section className="settings-card settings-password-card">
+          <div>
+            <span className="settings-password-title">비밀번호 변경</span>
+            <span className="settings-password-desc">시설 관리자 로그인 비밀번호를 변경합니다</span>
+          </div>
           <button
             type="button"
-            className="btn-primary"
+            className="settings-file-btn"
             onClick={() => setPwOpen(true)}
           >
             비밀번호 변경
           </button>
         </section>
 
-        <button
-          type="button"
-          className="btn-primary full-save"
-          disabled={!canSave}
-          onClick={() => save().catch(() => {})}
-        >
-          저장
-        </button>
+        <div className="settings-save-bar">
+          <button
+            type="button"
+            className="btn-primary settings-save-btn"
+            disabled={!canSave}
+            onClick={() => save().catch(() => {})}
+          >
+            저장
+          </button>
+        </div>
       </main>
 
       <PasswordChangeModal

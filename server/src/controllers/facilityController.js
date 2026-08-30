@@ -100,6 +100,17 @@ export const facilityController = {
     }
   },
 
+  async deleteImage(req, res, next) {
+    try {
+      const updated = await facilityService.updateSettings(req.params.facilityCode, {
+        profileImageUrl: '',
+      });
+      res.json({ ...updated, profileImageUrl: '' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async listWaitingTypes(req, res, next) {
     try {
       res.json(await facilityService.listWaitingTypes(req.params.facilityCode));

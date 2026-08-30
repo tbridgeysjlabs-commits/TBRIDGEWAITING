@@ -130,6 +130,30 @@ export function finalizeUploadedImage(file, uploadDir) {
 }
 
 /**
+ * Resolve legacy extensionless `/uploads/<hash>` to a file that exists on disk.
+ * @param {string|null|undefined} url
+ * @param {string} uploadDir
+ */
+export function resolvePublicUploadUrl(url, uploadDir) {
+  if (!url) return url || '';
+  const raw = String(url).trim();
+  if (!raw.startsWith('/uploads/')) return raw;
+
+  const name = path.basename(raw.split('?')[0]);
+  const direct = path.join(uploadDir, name);
+  if (fs.existsSync(direct)) return `/uploads/${name}`;
+
+  const base = path.basename(name, path.extname(name));
+  for (const ext of ['.png', '.jpg', '.jpeg', '.gif', '.webp']) {
+    const candidate = `${base}${ext}`;
+    if (fs.existsSync(path.join(uploadDir, candidate))) {
+      return `/uploads/${candidate}`;
+    }
+  }
+  return raw;
+}
+
+/**
  * express.static setHeaders — fixes extensionless legacy uploads.
  * @param {import('http').ServerResponse} res
  * @param {string} filePath

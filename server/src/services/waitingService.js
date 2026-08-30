@@ -5,6 +5,11 @@ import { customerRepository } from '../repositories/customerRepository.js';
 import { kakaoService } from './kakaoService.js';
 import { createError } from '../middleware/errorHandler.js';
 import { formatHourMinuteLabelKst } from '../utils/datetime.js';
+import { resolvePublicUploadUrl } from '../utils/imageUpload.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const UPLOAD_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
 
 function toastForRegisterKakao(kakaoResult) {
   switch (kakaoResult?.reason) {
@@ -315,7 +320,8 @@ export const waitingService = {
     return {
       facility: {
         name: facility.name,
-        profileImageUrl: facility.profile_image_url,
+        profileImageUrl:
+          resolvePublicUploadUrl(facility.profile_image_url, UPLOAD_DIR) || '',
         facilityCode: facility.facility_code,
         brandDisplayMode: 'image_text',
         theme: facility.theme === 'dark' ? 'dark' : 'light',

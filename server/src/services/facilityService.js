@@ -13,7 +13,13 @@ import {
   DEFAULT_FACILITY_PASSWORD,
   DEFAULT_MASTER_PASSWORD,
 } from '../constants/facilityPasswords.js';
+import { resolvePublicUploadUrl } from '../utils/imageUpload.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+
+const __facilityServiceDir = path.dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = path.join(__facilityServiceDir, '../../uploads');
 
 function requireStrongPassword(password, username) {
   const result = validatePassword(password, { username });
@@ -45,7 +51,7 @@ function toPublicFacility(row, lang = 'ko') {
     id: row.id,
     facilityCode: row.facility_code,
     name: row.name,
-    profileImageUrl: row.profile_image_url,
+    profileImageUrl: resolvePublicUploadUrl(row.profile_image_url, UPLOAD_DIR) || '',
     adminContact: row.admin_contact || '',
     kakaoSenderKey: row.kakao_sender_key,
     terms: pickTerm(row, 'terms_of_use', lang),
