@@ -44,8 +44,8 @@ export default function HistoryPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [pending, setPending] = useState(true);
-  const [completed, setCompleted] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
+  const [completed, setCompleted] = useState(true);
+  const [cancelled, setCancelled] = useState(true);
   const [phone, setPhone] = useState('');
   const [totalCount, setTotalCount] = useState('');
   const [dailySeq, setDailySeq] = useState('');
@@ -109,8 +109,8 @@ export default function HistoryPage() {
     setStartDate('');
     setEndDate('');
     setPending(true);
-    setCompleted(false);
-    setCancelled(false);
+    setCompleted(true);
+    setCancelled(true);
     setPhone('');
     setTotalCount('');
     setDailySeq('');
@@ -191,7 +191,7 @@ export default function HistoryPage() {
                 checked={completed}
                 onChange={(e) => setCompleted(e.target.checked)}
               />
-              대기완료
+              대기 완료
             </label>
             <label>
               <input

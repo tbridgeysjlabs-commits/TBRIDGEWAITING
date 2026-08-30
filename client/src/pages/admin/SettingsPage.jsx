@@ -623,10 +623,10 @@ export default function SettingsPage() {
             </div>
 
             <div className="settings-op-block">
-              <label>웨이팅 완료 모바일 웹 이미지 안내사항</label>
+              <label>웨이팅 관리 모바일 화면 안내사항</label>
               <textarea
                 rows={4}
-                placeholder="웨이팅 완료 모바일 페이지내 안내사항 입력"
+                placeholder="웨이팅 관리 모바일 화면 안내사항 입력"
                 value={form.storeNotice || ''}
                 onChange={(e) => setForm({ ...form, storeNotice: e.target.value })}
               />
@@ -761,7 +761,7 @@ export default function SettingsPage() {
               <div key={`notice-${lang.key}`} className="settings-term-group">
                 <div className="settings-term-title">
                   <span className="settings-lang-pill">{lang.label}</span>
-                  <span>키오스크 공지사항</span>
+                  <span>태블릿 웨이팅 화면 공지사항</span>
                 </div>
                 <textarea
                   rows={6}

@@ -808,7 +808,7 @@ a {
 .admin-layout .chip {
   background: #fff;
   border: 1px solid #e0e0da;
-  border-radius: 999px;
+  border-radius: 9px;
   color: #6d6d76;
   padding: 7px 13px;
   min-height: auto;
@@ -1019,20 +1019,23 @@ a {
 }
 
 .filter-box {
-  border: 1px solid #eeeeee;
-  border-radius: 8px;
-  padding: 16px;
+  border: 1px solid #e6e6e2;
+  border-radius: 14px;
+  padding: 20px 22px;
   background: #fff;
   margin-bottom: 16px;
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--admin-gap, 10px);
+  gap: 8px 16px;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .filter-row:last-child {
@@ -1042,45 +1045,58 @@ a {
 .filter-row > label {
   display: inline-flex;
   align-items: center;
-  gap: var(--admin-gap, 10px);
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  color: #5c5c66;
+  font-weight: 500;
+}
+
+.filter-row > label > input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: #d93b30;
   margin: 0;
 }
 
-.filter-row > label > input,
+.filter-row > label > input:not([type='checkbox']),
 .filter-row > label > select {
   margin: 0;
 }
 
 .filter-label {
   font-weight: 600;
-  min-width: 70px;
-  color: var(--text);
-  font-size: 14px;
+  min-width: 78px;
+  color: #8a8a92;
+  font-size: 12.5px;
 }
 
 .preset-group {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--admin-gap, 10px);
+  gap: 6px;
+  align-items: center;
 }
 
 .chip {
-  border: 1px solid #dddddd;
+  border: 1px solid #e0e0da;
   background: #fff;
-  border-radius: 999px;
-  padding: 8px 14px;
-  min-height: var(--admin-input-h, 40px);
+  border-radius: 9px;
+  padding: 7px 13px;
+  min-height: auto;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #6d6d76;
 }
 
 .chip.active {
-  background: #222;
+  background: #15161a;
   color: #fff;
-  border-color: #222;
+  border-color: #15161a;
 }
 
 .list-toolbar {
@@ -1093,8 +1109,8 @@ a {
 
 .table-wrap {
   background: #fff;
-  border: 1px solid #eeeeee;
-  border-radius: 8px;
+  border: 1px solid #e6e6e2;
+  border-radius: 14px;
   overflow: auto;
   box-shadow: none;
 }
@@ -1106,11 +1122,11 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #eeeeee;
-  padding: 12px 14px;
+  border-bottom: 1px solid #eeeeea;
+  padding: 13px 14px;
   text-align: left;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 12.5px;
 }
 
 th {
@@ -2770,18 +2786,20 @@ th {
   font-size: 13.5px;
 }
 
-/* 대기 운영 4항목 — 한 줄 */
+/* 대기 운영 4항목 — 한 줄 고정 */
 .settings-op-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 22px 24px;
-  align-items: start;
+  align-items: flex-start;
+  width: 100%;
 }
 
 .settings-op-field {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -3068,7 +3086,6 @@ th {
 
 @media (max-width: 1100px) {
   .settings-op-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px 14px;
   }
 
@@ -3089,7 +3106,14 @@ th {
   }
 
   .settings-op-row {
-    grid-template-columns: 1fr;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .settings-op-field {
+    flex: 1 0 140px;
   }
 
   .settings-password-card {
@@ -3103,13 +3127,13 @@ th {
 }
 
 .admin-main .waiting-list-box {
-  border: 1px solid #eeeeee;
-  border-radius: 8px;
+  border: 1px solid #e6e6e2;
+  border-radius: 14px;
   box-shadow: none;
 }
 
 .admin-main .enter-btn {
-  border-radius: 8px;
+  border-radius: 9px;
   min-height: 48px;
   background: #15161a;
 }
@@ -3119,10 +3143,35 @@ th {
 }
 
 .admin-main .billing-summary {
-  border: 1px solid #eeeeee;
-  border-radius: 8px;
+  border: 1px solid #e6e6e2;
+  border-radius: 14px;
   box-shadow: none;
   font-weight: 600;
+}
+
+.admin-layout .filter-row input[type='date'],
+.admin-layout .filter-row input:not([type='checkbox']):not([type='radio']),
+.admin-layout .filter-row select {
+  padding: 7px 10px;
+  border: 1px solid #e0e0da;
+  border-radius: 8px;
+  font-size: 12.5px;
+  min-height: 36px;
+  color: #5c5c66;
+}
+
+.admin-layout th {
+  background: #fafaf8;
+  color: #8a8a92;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 13px 16px;
+}
+
+.admin-layout td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #15161a;
 }
 
 .admin-main .linkish {
