@@ -95,9 +95,11 @@ export default function SystemSettingsPage() {
           <label>
             관리자 연락처
             <input
-              placeholder="연락처 입력 (예: 02-1234-5678)"
+              type="tel"
+              inputMode="numeric"
+              placeholder="- 빼고 숫자만 입력"
               value={adminContact}
-              onChange={(e) => setAdminContact(e.target.value)}
+              onChange={(e) => setAdminContact(e.target.value.replace(/\D/g, ''))}
             />
           </label>
           <p style={{ color: '#888', fontSize: 13, marginTop: -4 }}>

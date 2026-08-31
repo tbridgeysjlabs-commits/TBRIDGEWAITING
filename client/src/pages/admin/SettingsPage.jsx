@@ -534,9 +534,16 @@ export default function SettingsPage() {
             <div className="settings-field-row">
               <span className="settings-field-label">관리자 연락처</span>
               <input
-                placeholder="연락처 입력"
+                type="tel"
+                inputMode="numeric"
+                placeholder="- 빼고 숫자만 입력"
                 value={form.adminContact}
-                onChange={(e) => setForm({ ...form, adminContact: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    adminContact: e.target.value.replace(/\D/g, ''),
+                  })
+                }
               />
             </div>
           </div>
