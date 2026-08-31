@@ -177,10 +177,10 @@ export default function AgreementPage() {
               <AgreementCheckbox
                 checked={allChecked}
                 onChange={setAll}
-                ariaLabel="전체 약관에 동의합니다."
+                ariaLabel={t('agree_all')}
               />
               <span className="text-[clamp(0.95rem,2vh,1.15rem)] font-semibold text-[var(--cw-text,#fff)]">
-                전체 약관에 동의합니다.
+                {t('agree_all')}
               </span>
             </label>
 
@@ -189,11 +189,11 @@ export default function AgreementPage() {
                 <AgreementCheckbox
                   checked={termsOfUse}
                   onChange={setTermsOfUse}
-                  ariaLabel="이용약관 동의"
+                  ariaLabel={`${t('terms_label_service')} ${t('required_tag')}`}
                 />
                 <span className="text-[clamp(0.9rem,1.9vh,1.1rem)] text-[var(--cw-text,#fff)]">
-                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">[필수]</span>
-                  이용약관 동의
+                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">{t('required_tag')}</span>
+                  {t('terms_label_service')}
                 </span>
               </label>
 
@@ -201,11 +201,11 @@ export default function AgreementPage() {
                 <AgreementCheckbox
                   checked={privacy}
                   onChange={setPrivacy}
-                  ariaLabel="개인정보 수집 및 이용 동의"
+                  ariaLabel={`${t('terms_label_privacy')} ${t('required_tag')}`}
                 />
                 <span className="text-[clamp(0.9rem,1.9vh,1.1rem)] text-[var(--cw-text,#fff)]">
-                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">[필수]</span>
-                  개인정보 수집·이용 동의
+                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">{t('required_tag')}</span>
+                  {t('terms_label_privacy')}
                 </span>
               </label>
 
@@ -213,36 +213,36 @@ export default function AgreementPage() {
                 <AgreementCheckbox
                   checked={marketing}
                   onChange={setMarketing}
-                  ariaLabel="마케팅 정보 수신 동의"
+                  ariaLabel={`${t('terms_label_marketing')} ${t('optional_tag')}`}
                 />
                 <span className="text-[clamp(0.9rem,1.9vh,1.1rem)] text-[var(--cw-text,#fff)]">
-                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">[선택]</span>
-                  마케팅 정보 수신 동의
+                  <span className="mr-1 text-[var(--cw-accent,#A78BFA)]">{t('optional_tag')}</span>
+                  {t('terms_label_marketing')}
                 </span>
               </label>
             </div>
 
             <p className="mt-5 text-[clamp(0.75rem,1.5vh,0.85rem)] leading-relaxed text-[var(--cw-text-muted,#9CA3AF)]">
-              선택 항목에 동의하지 않아도 웨이팅 등록은 가능합니다.
+              {t('agree_optional_hint')}
             </p>
           </div>
 
           <div className="min-h-[clamp(14rem,42vh,28rem)] overflow-y-auto rounded-2xl border border-[var(--cw-border,rgba(255,255,255,0.08))] bg-[var(--cw-terms-body-bg,#1A1A24)] px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.9rem,2vh,1.25rem)] text-[clamp(0.85rem,1.7vh,1rem)] leading-relaxed text-[var(--cw-terms-body-fg,#E5E7EB)] [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]">
             <section className="mb-5">
               <h3 className="mb-2 text-[1.05em] font-bold text-[var(--cw-accent,#A78BFA)]">
-                이용약관 동의 (필수)
+                {t('terms_required')}
               </h3>
               <TermsBody html={termsBody} />
             </section>
             <section className="mb-5">
               <h3 className="mb-2 text-[1.05em] font-bold text-[var(--cw-accent,#A78BFA)]">
-                개인정보 수집·이용 동의 (필수)
+                {t('privacy_required')}
               </h3>
               <TermsBody html={privacyBody} />
             </section>
             <section>
               <h3 className="mb-2 text-[1.05em] font-bold text-[var(--cw-accent,#A78BFA)]">
-                마케팅 정보 수신 동의 (선택)
+                {t('marketing_optional')}
               </h3>
               <TermsBody html={marketingBody} />
             </section>

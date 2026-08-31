@@ -3183,6 +3183,43 @@ th {
   color: #d93b30;
 }
 
+.facility-code-btn,
+.facility-link-copy {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.facility-code-btn {
+  color: #d93b30;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.facility-code-btn:hover {
+  color: #a82c23;
+}
+
+.facility-link-copy {
+  color: #5c5c66;
+  border-bottom: 1px dashed transparent;
+}
+
+.facility-link-copy:hover {
+  color: #15161a;
+  border-bottom-color: #c8c8c2;
+}
+
 @media (max-width: 720px) {
   .settings-main .settings-section > label,
   .settings-main .term-lang-block > label {

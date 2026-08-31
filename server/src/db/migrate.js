@@ -317,6 +317,75 @@ async function migrate() {
     `UPDATE facilities SET master_username = COALESCE(master_username, '')`
   ).catch(() => {});
 
+  // 약관 동의 페이지 라벨 다국어 리소스 upsert
+  {
+    const agreementI18n = {
+      ko: {
+        agree_all: '전체 약관에 동의합니다.',
+        terms_label_service: '이용약관 동의',
+        terms_label_privacy: '개인정보 수집·이용 동의',
+        terms_label_marketing: '마케팅 정보 수신 동의',
+        required_tag: '[필수]',
+        optional_tag: '[선택]',
+        terms_required: '이용약관 동의 (필수)',
+        privacy_required: '개인정보 수집·이용 동의 (필수)',
+        marketing_optional: '마케팅 정보 수신 동의 (선택)',
+        agree_optional_hint: '선택 항목에 동의하지 않아도 웨이팅 등록은 가능합니다.',
+        agreement_guide: '웨이팅 등록을 위해 약관에 동의해주세요.',
+      },
+      en: {
+        agree_all: 'I agree to all terms.',
+        terms_label_service: 'Terms of Use',
+        terms_label_privacy: 'Collection and Use of Personal Information',
+        terms_label_marketing: 'Marketing Information Consent',
+        required_tag: '[Required]',
+        optional_tag: '[Optional]',
+        terms_required: 'Terms of Use (Required)',
+        privacy_required: 'Collection and Use of Personal Information (Required)',
+        marketing_optional: 'Marketing Information Consent (Optional)',
+        agree_optional_hint: 'You can still register without agreeing to optional items.',
+        agreement_guide: 'Please agree to the terms to register for waiting.',
+      },
+      ja: {
+        agree_all: 'すべての規約に同意します。',
+        terms_label_service: '利用規約への同意',
+        terms_label_privacy: '個人情報の収集・利用への同意',
+        terms_label_marketing: 'マーケティング情報の受信への同意',
+        required_tag: '[必須]',
+        optional_tag: '[任意]',
+        terms_required: '利用規約への同意（必須）',
+        privacy_required: '個人情報の収集・利用への同意（必須）',
+        marketing_optional: 'マーケティング情報の受信への同意（任意）',
+        agree_optional_hint: '任意項目に同意しなくてもウェイティング登録は可能です。',
+        agreement_guide: 'ウェイティング登録のため、規約に同意してください。',
+      },
+      zh: {
+        agree_all: '同意全部条款。',
+        terms_label_service: '同意使用条款',
+        terms_label_privacy: '同意收集·使用个人信息',
+        terms_label_marketing: '同意接收营销信息',
+        required_tag: '[必填]',
+        optional_tag: '[可选]',
+        terms_required: '同意使用条款（必填）',
+        privacy_required: '同意收集·使用个人信息（必填）',
+        marketing_optional: '同意接收营销信息（可选）',
+        agree_optional_hint: '即使不同意可选项，也可以完成排队登记。',
+        agreement_guide: '请同意条款以完成排队登记。',
+      },
+    };
+    for (const [lang, map] of Object.entries(agreementI18n)) {
+      for (const [key, value] of Object.entries(map)) {
+        await query(
+          `INSERT INTO translations (lang_code, resource_key, resource_value)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (lang_code, resource_key)
+           DO UPDATE SET resource_value = EXCLUDED.resource_value`,
+          [lang, key, value]
+        ).catch(() => {});
+      }
+    }
+  }
+
   console.log('Migration completed.');
   await pool.end();
 }

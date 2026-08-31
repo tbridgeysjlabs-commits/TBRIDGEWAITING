@@ -9,7 +9,38 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 import { validatePassword } from '../../utils/passwordPolicy';
 
-const DEFAULT_MASTER_PASSWORD = 'tbridge1234!';
+function toAbsoluteUrl(pathOrUrl) {
+  const raw = String(pathOrUrl || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${origin}${raw.startsWith('/') ? raw : `/${raw}`}`;
+}
+
+async function copyToClipboard(text) {
+  const value = String(text || '');
+  if (!value) throw new Error('복사할 값이 없습니다.');
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      /* fallback below */
+    }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = value;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-9999px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, value.length);
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('클립보드 복사에 실패했습니다.');
+}
 
 const emptyForm = {
   name: '',
@@ -89,6 +120,15 @@ export default function FacilitiesPage() {
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
+  };
+
+  const copyLink = async (pathOrUrl) => {
+    try {
+      await copyToClipboard(toAbsoluteUrl(pathOrUrl));
+      showToast('해당 값이 복사되었습니다');
+    } catch (e) {
+      showToast(e.message || '클립보드 복사에 실패했습니다.');
+    }
   };
 
   const openCreate = () => {
@@ -210,18 +250,59 @@ export default function FacilitiesPage() {
               </tr>
             </thead>
             <tbody>
-              {facilities.map((f) => (
-                <tr key={f.id || f.facilityCode} onClick={() => openEdit(f)}>
-                  <td>{f.name}</td>
-                  <td>{f.facilityCode}</td>
-                  <td>{f.links?.customer || `/w/${f.facilityCode}`}</td>
-                  <td>{f.links?.admin || `/admin/${f.facilityCode}/login`}</td>
-                  <td>{f.links?.signage || `/signage/${f.facilityCode}`}</td>
-                  <td>{Number(f.kakaoUnitCost || 0).toLocaleString()}원</td>
-                  <td>{formatDateTime(f.createdAt)}</td>
-                  <td>{f.statusLabel || f.status}</td>
-                </tr>
-              ))}
+              {facilities.map((f) => {
+                const customerPath = f.links?.customer || `/w/${f.facilityCode}`;
+                const adminPath = f.links?.admin || `/admin/${f.facilityCode}/login`;
+                const signagePath = f.links?.signage || `/signage/${f.facilityCode}`;
+                return (
+                  <tr key={f.id || f.facilityCode}>
+                    <td>{f.name}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="facility-code-btn"
+                        onClick={() => openEdit(f)}
+                        title="시설사 수정"
+                      >
+                        {f.facilityCode}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="facility-link-copy"
+                        onClick={() => copyLink(customerPath)}
+                        title="URL 복사"
+                      >
+                        {customerPath}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="facility-link-copy"
+                        onClick={() => copyLink(adminPath)}
+                        title="URL 복사"
+                      >
+                        {adminPath}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="facility-link-copy"
+                        onClick={() => copyLink(signagePath)}
+                        title="URL 복사"
+                      >
+                        {signagePath}
+                      </button>
+                    </td>
+                    <td>{Number(f.kakaoUnitCost || 0).toLocaleString()}원</td>
+                    <td>{formatDateTime(f.createdAt)}</td>
+                    <td>{f.statusLabel || f.status}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
