@@ -31,6 +31,10 @@ router.put(
 
 // public facility / customer
 router.get('/facilities/:facilityCode/public', facilityController.getPublic);
+router.get(
+  '/facilities/:facilityCode/profile-image',
+  facilityController.serveProfileImage
+);
 router.post('/facilities/:facilityCode/waitings', waitingController.register);
 router.get('/facilities/:facilityCode/waitings/board', waitingController.board);
 router.get(

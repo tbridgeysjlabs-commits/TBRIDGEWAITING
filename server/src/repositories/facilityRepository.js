@@ -25,7 +25,8 @@ export const facilityRepository = {
               fs.waiting_notification_order,
               fs.store_notice, fs.ad_area_enabled,
               fs.avg_wait_minutes_per_team,
-              fs.kiosk_notice, fs.kiosk_notice_en, fs.kiosk_notice_ja, fs.kiosk_notice_zh
+              fs.kiosk_notice, fs.kiosk_notice_en, fs.kiosk_notice_ja, fs.kiosk_notice_zh,
+              fs.updated_at AS settings_updated_at
        FROM facilities f
        LEFT JOIN facility_settings fs ON fs.facility_id = f.id
        WHERE f.facility_code = $1`,

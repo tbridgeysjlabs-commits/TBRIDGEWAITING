@@ -320,8 +320,17 @@ export const waitingService = {
     return {
       facility: {
         name: facility.name,
-        profileImageUrl:
-          resolvePublicUploadUrl(facility.profile_image_url, UPLOAD_DIR) || '',
+        profileImageUrl: (() => {
+          const raw = String(facility.profile_image_url || '').trim();
+          if (!raw) return '';
+          if (raw.startsWith('data:') || raw.startsWith('/uploads/')) {
+            const ver = facility.updated_at || facility.settings_updated_at
+              ? new Date(facility.settings_updated_at || facility.updated_at).getTime()
+              : Date.now();
+            return `/api/facilities/${encodeURIComponent(facility.facility_code)}/profile-image?v=${ver}`;
+          }
+          return resolvePublicUploadUrl(raw, UPLOAD_DIR) || '';
+        })(),
         facilityCode: facility.facility_code,
         brandDisplayMode: 'image_text',
         theme: facility.theme === 'dark' ? 'dark' : 'light',

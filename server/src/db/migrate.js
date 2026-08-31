@@ -386,6 +386,70 @@ async function migrate() {
     }
   }
 
+  // 인원 입력 페이지 라벨 다국어
+  {
+    const partyI18n = {
+      ko: { total_party_label: '총 입장 인원', people_unit: '명' },
+      en: { total_party_label: 'Total guests', people_unit: 'people' },
+      ja: { total_party_label: '合計入場人数', people_unit: '名' },
+      zh: { total_party_label: '总入场人数', people_unit: '人' },
+    };
+    for (const [lang, map] of Object.entries(partyI18n)) {
+      for (const [key, value] of Object.entries(map)) {
+        await query(
+          `INSERT INTO translations (lang_code, resource_key, resource_value)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (lang_code, resource_key)
+           DO UPDATE SET resource_value = EXCLUDED.resource_value`,
+          [lang, key, value]
+        ).catch(() => {});
+      }
+    }
+  }
+
+  // /uploads 파일을 DB data URL로 백필 (Render ephemeral disk 대비)
+  {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const uploadDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
+    const { rows } = await query(
+      `SELECT facility_id, profile_image_url FROM facility_settings
+       WHERE profile_image_url IS NOT NULL
+         AND profile_image_url <> ''
+         AND profile_image_url NOT LIKE 'data:%'`
+    ).catch(() => ({ rows: [] }));
+    for (const row of rows) {
+      const raw = String(row.profile_image_url || '');
+      if (!raw.startsWith('/uploads/')) continue;
+      const name = path.basename(raw.split('?')[0]);
+      const filePath = path.join(uploadDir, name);
+      if (!fs.existsSync(filePath)) continue;
+      try {
+        const buf = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mime =
+          ext === '.png'
+            ? 'image/png'
+            : ext === '.gif'
+              ? 'image/gif'
+              : ext === '.webp'
+                ? 'image/webp'
+                : 'image/jpeg';
+        const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+        await query(
+          `UPDATE facility_settings
+           SET profile_image_url = $2, updated_at = NOW()
+           WHERE facility_id = $1`,
+          [row.facility_id, dataUrl]
+        );
+        console.log(`+ backfilled profile image for facility_id=${row.facility_id}`);
+      } catch (e) {
+        console.warn(`skip backfill ${name}:`, e.message);
+      }
+    }
+  }
+
   console.log('Migration completed.');
   await pool.end();
 }

@@ -96,37 +96,41 @@ export function createImageUpload(uploadDir) {
 }
 
 /**
- * Validate magic bytes and normalize extension. Returns public URL path.
+ * Validate magic bytes, persist file, and return durable payload for DB.
+ * Prefer data URL so Render ephemeral disk does not lose images after restart.
  * @param {Express.Multer.File} file
  * @param {string} uploadDir
+ * @returns {{ url: string, dataUrl: string, mime: string, fileName: string }}
  */
 export function finalizeUploadedImage(file, uploadDir) {
   if (!file?.path) {
     throw Object.assign(new Error('이미지 파일을 선택해 주세요.'), { status: 400 });
   }
 
-  const fd = fs.openSync(file.path, 'r');
-  const header = Buffer.alloc(12);
-  try {
-    fs.readSync(fd, header, 0, 12, 0);
-  } finally {
-    fs.closeSync(fd);
-  }
-
-  const sniffed = sniffImageExt(header);
+  const buf = fs.readFileSync(file.path);
+  const sniffed = sniffImageExt(buf);
   if (!sniffed) {
     fs.unlinkSync(file.path);
     throw Object.assign(new Error('올바른 이미지 파일이 아닙니다.'), { status: 400 });
   }
 
+  const mime = contentTypeForExt(sniffed) || 'application/octet-stream';
   const base = path.basename(file.path, path.extname(file.path));
   const finalName = `${base}${sniffed}`;
   const finalPath = path.join(uploadDir, finalName);
   if (finalPath !== file.path) {
     fs.renameSync(file.path, finalPath);
+  } else if (path.extname(file.path).toLowerCase() !== sniffed) {
+    fs.renameSync(file.path, finalPath);
   }
 
-  return `/uploads/${finalName}`;
+  const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+  return {
+    url: `/uploads/${finalName}`,
+    dataUrl,
+    mime,
+    fileName: finalName,
+  };
 }
 
 /**

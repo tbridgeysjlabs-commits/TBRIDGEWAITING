@@ -15,11 +15,29 @@ import {
 } from '../constants/facilityPasswords.js';
 import { resolvePublicUploadUrl } from '../utils/imageUpload.js';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
 const __facilityServiceDir = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__facilityServiceDir, '../../uploads');
+
+/** DB에 저장된 이미지(data URL 또는 /uploads) → 클라이언트가 쓰는 영구 API 경로 */
+function resolveProfileImageUrl(row) {
+  const raw = String(row?.profile_image_url || '').trim();
+  if (!raw) return '';
+  // 이미 data URL이면 API 경로로 노출(응답 크기·캐시 안정)
+  if (raw.startsWith('data:') || raw.startsWith('/uploads/')) {
+    const code = row.facility_code;
+    if (!code) {
+      return resolvePublicUploadUrl(raw, UPLOAD_DIR) || raw;
+    }
+    const stamp = row.settings_updated_at || row.updated_at;
+    const ver = stamp ? new Date(stamp).getTime() : Date.now();
+    return `/api/facilities/${encodeURIComponent(code)}/profile-image?v=${ver}`;
+  }
+  return resolvePublicUploadUrl(raw, UPLOAD_DIR) || raw;
+}
 
 function requireStrongPassword(password, username) {
   const result = validatePassword(password, { username });
@@ -51,7 +69,7 @@ function toPublicFacility(row, lang = 'ko') {
     id: row.id,
     facilityCode: row.facility_code,
     name: row.name,
-    profileImageUrl: resolvePublicUploadUrl(row.profile_image_url, UPLOAD_DIR) || '',
+    profileImageUrl: resolveProfileImageUrl(row),
     adminContact: row.admin_contact || '',
     kakaoSenderKey: row.kakao_sender_key,
     terms: pickTerm(row, 'terms_of_use', lang),
@@ -152,6 +170,44 @@ export const facilityService = {
   async listFacilities() {
     const rows = await facilityRepository.findAll();
     return rows.map((r) => toSystemFacility(r));
+  },
+
+  /**
+   * 프로필 이미지 바이너리 — DB data URL 우선, 없으면 /uploads 파일.
+   * @returns {{ buffer: Buffer, mime: string, etag: string } | null}
+   */
+  async getProfileImage(facilityCode) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) return null;
+    const raw = String(facility.profile_image_url || '').trim();
+    if (!raw) return null;
+
+    const stamp = facility.settings_updated_at || facility.updated_at || '';
+    const etag = `"${facility.facility_code}-${new Date(stamp || 0).getTime()}"`;
+
+    if (raw.startsWith('data:')) {
+      const match = raw.match(/^data:([^;,]+);base64,(.+)$/s);
+      if (!match) return null;
+      return {
+        buffer: Buffer.from(match[2], 'base64'),
+        mime: match[1] || 'application/octet-stream',
+        etag,
+      };
+    }
+
+    if (raw.startsWith('/uploads/')) {
+      const resolved = resolvePublicUploadUrl(raw, UPLOAD_DIR);
+      const name = path.basename(String(resolved || raw).split('?')[0]);
+      const filePath = path.join(UPLOAD_DIR, name);
+      if (!fs.existsSync(filePath)) return null;
+      const { contentTypeForExt } = await import('../utils/imageUpload.js');
+      const mime =
+        contentTypeForExt(path.extname(filePath).toLowerCase()) ||
+        'application/octet-stream';
+      return { buffer: fs.readFileSync(filePath), mime, etag };
+    }
+
+    return null;
   },
 
   async getPublicFacility(facilityCode, lang = 'ko') {

@@ -45,6 +45,25 @@ export const facilityController = {
     }
   },
 
+  async serveProfileImage(req, res, next) {
+    try {
+      const image = await facilityService.getProfileImage(req.params.facilityCode);
+      if (!image) {
+        return res.status(404).json({ message: '이미지를 찾을 수 없습니다.' });
+      }
+      if (req.headers['if-none-match'] === image.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader('Content-Type', image.mime);
+      res.setHeader('Content-Length', image.buffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
+      res.setHeader('ETag', image.etag);
+      return res.send(image.buffer);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async create(req, res, next) {
     try {
       const facility = await facilityService.createFacility({
@@ -84,13 +103,15 @@ export const facilityController = {
       if (!req.file) {
         return res.status(400).json({ message: '이미지 파일을 선택해 주세요.' });
       }
-      let url;
+      let finalized;
       try {
-        url = finalizeUploadedImage(req.file, UPLOAD_DIR);
+        finalized = finalizeUploadedImage(req.file, UPLOAD_DIR);
       } catch (err) {
         const status = err.status || 400;
         return res.status(status).json({ message: err.message || '업로드 실패' });
       }
+      // DB에 data URL 저장 — Render ephemeral disk에서도 재시작 후 유지
+      const url = finalized.dataUrl || finalized.url;
       const updated = await facilityService.updateSettings(req.params.facilityCode, {
         profileImageUrl: url,
       });
