@@ -42,6 +42,8 @@ async function copyToClipboard(text) {
   if (!ok) throw new Error('클립보드 복사에 실패했습니다.');
 }
 
+const DEFAULT_MASTER_PASSWORD = 'tbridge1234!';
+
 const emptyForm = {
   name: '',
   facilityCode: '',

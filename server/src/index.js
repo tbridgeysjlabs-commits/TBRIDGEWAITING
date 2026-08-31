@@ -14,13 +14,36 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const UPLOAD_DIR = path.join(__dirname, '../uploads');
 
+/** CLIENT_ORIGIN / CLIENT_ORIGINS — 콤마로 여러 프론트 URL 허용 */
+function parseAllowedOrigins() {
+  const raw = [
+    process.env.CLIENT_ORIGINS || '',
+    process.env.CLIENT_ORIGIN || '',
+  ]
+    .join(',')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const defaults = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
+  return [...new Set([...raw, ...defaults])];
+}
+
+const allowedOrigins = parseAllowedOrigins();
+
 app.use(
   cors({
-    origin: [
-      process.env.CLIENT_ORIGIN || 'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:5173',
-    ],
+    origin(origin, callback) {
+      // same-origin / curl / 서버간 호출 (Origin 헤더 없음)
+      if (!origin) return callback(null, true);
+      const normalized = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(normalized)) return callback(null, true);
+      // Render 미리보기·커스텀 도메인 누락 시 로그
+      console.warn(`[cors] blocked origin: ${origin}`);
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
