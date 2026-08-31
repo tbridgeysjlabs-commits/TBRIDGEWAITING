@@ -11,6 +11,7 @@ import CompleteCallNotice from '../../components/customer/complete/CompleteCallN
 import CompleteCancelledAlert from '../../components/customer/complete/CompleteCancelledAlert';
 import CompleteAdArea from '../../components/customer/complete/CompleteAdArea';
 import CompleteStoreNotice from '../../components/customer/complete/CompleteStoreNotice';
+import { useFacilitySocket } from '../../hooks/useFacilitySocket';
 import { themeStyle } from '../../theme/customerTheme';
 import { formatRegisteredAtKst } from '../../utils/datetime.js';
 
@@ -44,14 +45,23 @@ export default function CompletePage() {
     load().catch((e) => setToast(e.message));
   }, [load]);
 
-  // 호출 상태 반영을 위해 pending 동안 주기적으로 최신 상태 조회
+  // 소켓 실패 대비: pending 동안 느린 백업 폴링
   useEffect(() => {
     if (!data || data.waiting?.status !== 'pending') return undefined;
     const id = setInterval(() => {
       load().catch(() => {});
-    }, 5000);
+    }, 30000);
     return () => clearInterval(id);
   }, [data?.waiting?.status, load]);
+
+  useFacilitySocket(facilityCode, {
+    onEvent: () => {
+      load().catch(() => {});
+    },
+    onReconnect: () => {
+      load().catch(() => {});
+    },
+  });
 
   const showToast = (msg) => {
     setToast(msg);

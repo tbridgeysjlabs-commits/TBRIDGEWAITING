@@ -4,6 +4,7 @@ import { waitingRepository } from '../repositories/waitingRepository.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 import { kakaoService } from './kakaoService.js';
 import { createError } from '../middleware/errorHandler.js';
+import { emitWaitingChanged } from '../realtime/socketHub.js';
 import { formatHourMinuteLabelKst } from '../utils/datetime.js';
 import { resolvePublicUploadUrl } from '../utils/imageUpload.js';
 import path from 'path';
@@ -231,8 +232,11 @@ export const waitingService = {
     void kakaoService.sendCallEntry({ facility, waiting: updated });
     void kakaoService.notifyImminentEntries(facility);
 
+    const waiting = mapWaiting(updated);
+    emitWaitingChanged(facilityCode, { reason: 'called', waiting });
+
     return {
-      waiting: mapWaiting(updated),
+      waiting,
       entryWaitMinutes: minutes,
       toast: `${updated.daily_seq}번 팀을 호출했습니다.`,
     };
@@ -290,9 +294,11 @@ export const waitingService = {
     waiting = await waitingRepository.findById(waiting.id);
 
     const { position } = await getQueuePosition(facility.id, waiting.id);
+    const mapped = { ...mapWaiting(waiting), order: position };
+    emitWaitingChanged(facilityCode, { reason: 'registered', waiting: mapped });
 
     return {
-      waiting: { ...mapWaiting(waiting), order: position },
+      waiting: mapped,
       completePageLink,
       kakao: kakaoResult,
       toast: toastForRegisterKakao(kakaoResult),
@@ -372,8 +378,10 @@ export const waitingService = {
     if (!updated) throw createError(400, '대기 중인 항목만 완료 처리할 수 있습니다.');
     await waitingRepository.renumberPendingQueue(facility.id);
     void kakaoService.notifyImminentEntries(facility);
+    const waiting = mapWaiting(updated);
+    emitWaitingChanged(facilityCode, { reason: 'completed', waiting });
     return {
-      waiting: mapWaiting(updated),
+      waiting,
       toast: '대기완료 리스트로 이동하였습니다.',
     };
   },
@@ -416,8 +424,10 @@ export const waitingService = {
       reason: isNoShow ? 'no_show' : 'manual',
     });
     void kakaoService.notifyImminentEntries(facility);
+    const waiting = mapWaiting(updated);
+    emitWaitingChanged(facilityCode, { reason: 'cancelled', waiting });
     return {
-      waiting: mapWaiting(updated),
+      waiting,
       toast: isNoShow
         ? '미입장으로 처리되었습니다.'
         : '대기취소 리스트로 이동하였습니다.',
@@ -479,6 +489,11 @@ export const waitingService = {
       });
     }
     void kakaoService.notifyImminentEntries(facility);
+    emitWaitingChanged(facilityCode, {
+      reason: 'postponed',
+      waitingId,
+      waiting: postponed ? mapWaiting(postponed) : null,
+    });
     return this.getCompletePage(facilityCode, waitingId);
   },
 

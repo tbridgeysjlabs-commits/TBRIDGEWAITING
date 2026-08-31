@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, formatTime, mediaUrl } from '../../api/client';
+import { useFacilitySocket } from '../../hooks/useFacilitySocket';
 import { toKstClockParts } from '../../utils/datetime.js';
 import styles from './SignagePage.module.css';
 
@@ -77,7 +78,7 @@ export default function SignagePage() {
   const prevCalledId = useRef(null);
   const initialized = useRef(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [f, board] = await Promise.all([
       api(`/facilities/${facilityCode}/public`),
       api(`/facilities/${facilityCode}/waitings/board`),
@@ -115,15 +116,25 @@ export default function SignagePage() {
     setEntryWaitMinutes(
       Math.max(1, Number(board.entryWaitMinutes ?? f.entryWaitMinutes ?? 3))
     );
-  };
+  }, [facilityCode]);
 
   useEffect(() => {
     initialized.current = false;
     prevCalledId.current = null;
     load().catch((e) => setError(e.message));
-    const id = setInterval(() => load().catch(() => {}), 3000);
+    // 소켓 실패·미입장 만료 처리용 백업 폴링 (실시간은 Socket.io)
+    const id = setInterval(() => load().catch(() => {}), 30000);
     return () => clearInterval(id);
-  }, [facilityCode]);
+  }, [facilityCode, load]);
+
+  useFacilitySocket(facilityCode, {
+    onEvent: () => {
+      load().catch(() => {});
+    },
+    onReconnect: () => {
+      load().catch(() => {});
+    },
+  });
 
   const waitingForDisplay = useMemo(() => {
     if (!activeCall) return pending;

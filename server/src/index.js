@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { initSocketServer } from './realtime/socketHub.js';
 import { setUploadContentType, resolvePublicUploadUrl } from './utils/imageUpload.js';
 
 dotenv.config();
@@ -75,6 +77,9 @@ app.use('/api', routes);
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = http.createServer(app);
+initSocketServer(server, { allowedOrigins });
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`T-Bridge Waiting API listening on http://localhost:${PORT}`);
 });

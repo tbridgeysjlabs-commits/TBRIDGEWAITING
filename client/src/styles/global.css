@@ -2770,6 +2770,11 @@ th {
   min-height: auto;
 }
 
+.settings-file-btn:hover,
+.settings-file-btn.btn-search:hover {
+  color: #ffffff;
+}
+
 .settings-add-btn {
   padding: 8px 16px;
   border-radius: 8px;

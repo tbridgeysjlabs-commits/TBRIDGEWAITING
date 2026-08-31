@@ -5,6 +5,7 @@ import AdminSidebar from '../../components/admin/AdminSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useClock } from '../../hooks/useClock';
+import { useFacilitySocket } from '../../hooks/useFacilitySocket';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 
 function useNowMs(intervalMs = 1000) {
@@ -48,9 +49,19 @@ export default function WaitingManagePage() {
 
   useEffect(() => {
     load().catch((e) => setToast(e.message));
-    const id = setInterval(() => load().catch(() => {}), 10000);
+    // 소켓 실패·미입장 만료 처리용 백업 폴링
+    const id = setInterval(() => load().catch(() => {}), 30000);
     return () => clearInterval(id);
   }, [load]);
+
+  useFacilitySocket(facilityCode, {
+    onEvent: () => {
+      load().catch(() => {});
+    },
+    onReconnect: () => {
+      load().catch(() => {});
+    },
+  });
 
   // 호출 데드라인 종료 직후 보드 재조회 → 서버에서 미입장(no_show) 자동 처리
   useEffect(() => {
