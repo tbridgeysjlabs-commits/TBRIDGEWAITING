@@ -26,7 +26,44 @@ export function uploadFacilityImage(req, res, next) {
 export const facilityController = {
   async list(req, res, next) {
     try {
-      res.json(await facilityService.listFacilities());
+      const statuses = req.query.statuses
+        ? String(req.query.statuses)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+      res.json(
+        await facilityService.listFacilities({
+          q: req.query.q || req.query.search || '',
+          statuses,
+        })
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async exportFacilities(req, res, next) {
+    try {
+      const statuses = req.query.statuses
+        ? String(req.query.statuses)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+      const buffer = await facilityService.exportFacilitiesExcel({
+        q: req.query.q || req.query.search || '',
+        statuses,
+      });
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="facilities.xlsx"'
+      );
+      res.send(Buffer.from(buffer));
     } catch (err) {
       next(err);
     }

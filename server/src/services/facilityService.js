@@ -167,9 +167,39 @@ function mapType(t) {
 }
 
 export const facilityService = {
-  async listFacilities() {
-    const rows = await facilityRepository.findAll();
+  async listFacilities(filters = {}) {
+    const rows = await facilityRepository.findAll(filters);
     return rows.map((r) => toSystemFacility(r));
+  },
+
+  async exportFacilitiesExcel(filters = {}) {
+    const ExcelJS = (await import('exceljs')).default;
+    const items = await this.listFacilities(filters);
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('시설사');
+    sheet.columns = [
+      { header: '시설사명', key: 'name', width: 24 },
+      { header: '시설사 코드', key: 'facilityCode', width: 18 },
+      { header: '사용자 화면', key: 'customer', width: 28 },
+      { header: '관리자 화면', key: 'admin', width: 32 },
+      { header: '사이니지', key: 'signage', width: 28 },
+      { header: '알림톡 단가', key: 'kakaoUnitCost', width: 12 },
+      { header: '등록일', key: 'createdAt', width: 22 },
+      { header: '상태', key: 'status', width: 10 },
+    ];
+    for (const f of items) {
+      sheet.addRow({
+        name: f.name,
+        facilityCode: f.facilityCode,
+        customer: f.links?.customer || `/w/${f.facilityCode}`,
+        admin: f.links?.admin || `/admin/${f.facilityCode}/login`,
+        signage: f.links?.signage || `/signage/${f.facilityCode}`,
+        kakaoUnitCost: Number(f.kakaoUnitCost || 0),
+        createdAt: f.createdAt ? new Date(f.createdAt) : '',
+        status: f.statusLabel || f.status,
+      });
+    }
+    return workbook.xlsx.writeBuffer();
   },
 
   /**

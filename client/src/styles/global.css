@@ -1012,6 +1012,43 @@ a {
   border-color: #15161a !important;
 }
 
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.filter-actions .btn-ghost {
+  min-height: 36px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.facility-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.facility-status-badge.is-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.facility-status-badge.is-withdraw {
+  background: #f3f3f6;
+  color: #6d6d76;
+}
+
 .empty-list {
   padding: 40px;
   text-align: center;

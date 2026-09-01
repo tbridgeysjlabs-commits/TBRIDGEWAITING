@@ -1,31 +1,100 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import SystemSidebar from '../../components/system/SystemSidebar';
+import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
+import {
+  SEARCH_PERIOD_PRESETS,
+  resolveSearchRange,
+} from '../../utils/searchPresets';
+import { formatDateTimeShortKst } from '../../utils/datetime.js';
 
 export default function SystemCustomersPage() {
   const { systemUser, logoutSystem } = useAuth();
   const navigate = useNavigate();
   const { collapsed, toggle } = useSidebarCollapse('tb_system_sidebar');
-  const [facilityName, setFacilityName] = useState('');
   const [data, setData] = useState({ items: [], total: 0 });
+  const [toast, setToast] = useState('');
 
-  const load = () => {
-    const qs = facilityName ? `?facilityName=${encodeURIComponent(facilityName)}` : '';
-    return api(`/system-admin/customers${qs}`, {}, 'system').then(setData);
-  };
+  const [preset, setPreset] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [agreed, setAgreed] = useState(true);
+  const [notAgreed, setNotAgreed] = useState(true);
+  const [phone, setPhone] = useState('');
+  const [facilityName, setFacilityName] = useState('');
+
+  const marketingParam = useMemo(() => {
+    const list = [];
+    if (agreed) list.push('agreed');
+    if (notAgreed) list.push('not_agreed');
+    return list.join(',');
+  }, [agreed, notAgreed]);
+
+  const queryString = useCallback(() => {
+    const range = resolveSearchRange(preset, startDate, endDate);
+    const params = new URLSearchParams();
+    if (range.startDate) params.set('startDate', range.startDate);
+    if (range.endDate) params.set('endDate', range.endDate);
+    if (marketingParam) params.set('marketing', marketingParam);
+    if (phone) params.set('phone', phone);
+    if (facilityName.trim()) params.set('facilityName', facilityName.trim());
+    params.set('pageSize', '500');
+    return params.toString();
+  }, [preset, startDate, endDate, marketingParam, phone, facilityName]);
+
+  const load = useCallback(async () => {
+    if (!systemUser) return;
+    try {
+      const result = await api(
+        `/system-admin/customers?${queryString()}`,
+        {},
+        'system'
+      );
+      setData(result);
+    } catch (e) {
+      setData({ items: [], total: 0 });
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    }
+  }, [systemUser, queryString]);
 
   useEffect(() => {
-    if (!systemUser) return;
-    load().catch(() => setData({ items: [], total: 0 }));
-  }, [systemUser]);
+    const id = setTimeout(() => {
+      load();
+    }, 200);
+    return () => clearTimeout(id);
+  }, [load]);
 
   if (!systemUser) return <Navigate to="/system-admin/login" replace />;
 
+  const applyPreset = (key) => {
+    setPreset(key);
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const onCustomDate = (which, value) => {
+    setPreset('');
+    if (which === 'start') setStartDate(value);
+    else setEndDate(value);
+  };
+
+  const reset = () => {
+    setPreset('all');
+    setStartDate('');
+    setEndDate('');
+    setAgreed(true);
+    setNotAgreed(true);
+    setPhone('');
+    setFacilityName('');
+  };
+
   return (
     <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+      <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
         onToggle={toggle}
@@ -36,16 +105,84 @@ export default function SystemCustomersPage() {
       />
       <main className="admin-main">
         <h1>고객 관리 (전체 시설사)</h1>
-        <div className="filter-row" style={{ marginBottom: 16 }}>
-          <input
-            placeholder="시설사명 검색"
-            value={facilityName}
-            onChange={(e) => setFacilityName(e.target.value)}
-          />
-          <button type="button" className="btn-dark" onClick={load}>
-            검색
-          </button>
-        </div>
+
+        <section className="filter-box">
+          <div className="filter-row">
+            <span className="filter-label">검색 기간</span>
+            <div className="preset-group">
+              {SEARCH_PERIOD_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className={`chip ${preset === p.key ? 'active' : ''}`}
+                  onClick={() => applyPreset(p.key)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => onCustomDate('start', e.target.value)}
+            />
+            <span>~</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => onCustomDate('end', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-row">
+            <span className="filter-label">마케팅 동의 여부</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              동의
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={notAgreed}
+                onChange={(e) => setNotAgreed(e.target.checked)}
+              />
+              미동의
+            </label>
+          </div>
+
+          <div className="filter-row">
+            <span className="filter-label">시설사명</span>
+            <input
+              placeholder="시설사명 검색"
+              value={facilityName}
+              onChange={(e) => setFacilityName(e.target.value)}
+              style={{ minWidth: 280, flex: 1 }}
+            />
+          </div>
+
+          <div className="filter-row">
+            <span className="filter-label">전화번호</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="숫자만 입력"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+              style={{ minWidth: 220 }}
+            />
+          </div>
+
+          <div className="filter-actions">
+            <button type="button" className="btn-ghost" onClick={reset}>
+              초기화
+            </button>
+          </div>
+        </section>
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -57,18 +194,26 @@ export default function SystemCustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.facilityName}</td>
-                  <td>{formatDateTime(item.registeredAt)}</td>
-                  <td>{item.phoneDisplay}</td>
-                  <td>
-                    {item.marketingAgreed
-                      ? `동의 (${formatDateTime(item.marketingAgreedAt)})`
-                      : '미동의'}
+              {data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="empty-list">
+                    검색 조건에 해당하는 고객이 없습니다.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.facilityName}</td>
+                    <td>{formatDateTime(item.registeredAt)}</td>
+                    <td>{item.phoneDisplay}</td>
+                    <td>
+                      {item.marketingAgreed
+                        ? `동의 (${formatDateTimeShortKst(item.marketingAgreedAt)})`
+                        : '미동의'}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

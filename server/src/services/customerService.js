@@ -25,32 +25,50 @@ function mapCustomer(row) {
   };
 }
 
+function parseMarketing(queryValue) {
+  if (queryValue == null || queryValue === '') return [];
+  if (Array.isArray(queryValue)) return queryValue.map(String);
+  return String(queryValue)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function parseCustomerListQuery(query = {}) {
+  return {
+    startDate: query.startDate ? String(query.startDate) : '',
+    endDate: query.endDate ? String(query.endDate) : '',
+    phone: query.phone ? String(query.phone).replace(/\D/g, '') : '',
+    facilityName: query.facilityName ? String(query.facilityName).trim() : '',
+    marketing: parseMarketing(query.marketing),
+    page: Number(query.page || 1),
+    pageSize: Number(query.pageSize || 500),
+  };
+}
+
 export const customerService = {
-  async listByFacility(facilityCode, pagination) {
+  async listByFacility(facilityCode, filters) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
-    const { rows, total } = await customerRepository.listByFacility(
+    const { rows, total, page, pageSize } = await customerRepository.listByFacility(
       facility.id,
-      pagination
+      filters
     );
     return {
       items: rows.map(mapCustomer),
       total,
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      page,
+      pageSize,
     };
   },
 
-  async listAll(filters, pagination) {
-    const { rows, total } = await customerRepository.listAll({
-      facilityName: filters.facilityName,
-      ...pagination,
-    });
+  async listAll(filters) {
+    const { rows, total, page, pageSize } = await customerRepository.listAll(filters);
     return {
       items: rows.map(mapCustomer),
       total,
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      page,
+      pageSize,
     };
   },
 };

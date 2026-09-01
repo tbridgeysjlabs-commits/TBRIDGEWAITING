@@ -1,14 +1,48 @@
 import { query } from '../db/pool.js';
 
 export const facilityRepository = {
-  async findAll() {
+  async findAll(filters = {}) {
+    const clauses = [];
+    const params = [];
+    let i = 1;
+
+    const q = String(filters.q || filters.search || '').trim();
+    if (q) {
+      clauses.push(
+        `(f.name ILIKE $${i} OR f.facility_code ILIKE $${i})`
+      );
+      params.push(`%${q}%`);
+      i += 1;
+    }
+
+    // statuses: ['active','withdraw'] — 비어 있거나 둘 다면 필터 없음
+    let statuses = filters.statuses;
+    if (typeof statuses === 'string') {
+      statuses = statuses.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (Array.isArray(statuses) && statuses.length) {
+      const wantActive = statuses.includes('active');
+      const wantWithdraw =
+        statuses.includes('withdraw') || statuses.includes('inactive');
+      if (wantActive && !wantWithdraw) {
+        clauses.push(`f.status = $${i++}`);
+        params.push('active');
+      } else if (!wantActive && wantWithdraw) {
+        clauses.push(`f.status = ANY($${i++})`);
+        params.push(['withdraw', 'inactive']);
+      }
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const { rows } = await query(
       `SELECT f.*, fs.profile_image_url, fs.enabled_languages,
               fs.postpone_policy, fs.postpone_limit,
               fs.store_notice, fs.ad_area_enabled
        FROM facilities f
        LEFT JOIN facility_settings fs ON fs.facility_id = f.id
-       ORDER BY f.created_at DESC`
+       ${where}
+       ORDER BY f.created_at DESC`,
+      params
     );
     return rows;
   },

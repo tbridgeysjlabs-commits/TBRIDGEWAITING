@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
@@ -74,18 +74,72 @@ export default function FacilitiesPage() {
   const [form, setForm] = useState(emptyForm);
   const [initialSnapshot, setInitialSnapshot] = useState('');
   const [toast, setToast] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [statusActive, setStatusActive] = useState(true);
+  const [statusWithdraw, setStatusWithdraw] = useState(true);
 
   const dirty = useMemo(() => {
     if (!open || mode !== 'edit') return false;
     return snapshotOf(form) !== initialSnapshot;
   }, [open, mode, form, initialSnapshot]);
 
-  const load = () => api('/system-admin/facilities', {}, 'system').then(setFacilities);
+  const statusesParam = useMemo(() => {
+    const list = [];
+    if (statusActive) list.push('active');
+    if (statusWithdraw) list.push('withdraw');
+    return list.join(',');
+  }, [statusActive, statusWithdraw]);
+
+  const queryString = useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchQ.trim()) params.set('q', searchQ.trim());
+    if (statusesParam) params.set('statuses', statusesParam);
+    return params.toString();
+  }, [searchQ, statusesParam]);
+
+  const load = useCallback(() => {
+    const qs = queryString();
+    return api(
+      `/system-admin/facilities${qs ? `?${qs}` : ''}`,
+      {},
+      'system'
+    ).then(setFacilities);
+  }, [queryString]);
 
   useEffect(() => {
     if (!systemUser) return;
-    load().catch((e) => setToast(e.message));
-  }, [systemUser]);
+    const id = setTimeout(() => {
+      load().catch((e) => setToast(e.message));
+    }, 200);
+    return () => clearTimeout(id);
+  }, [systemUser, load]);
+
+  const resetFilters = () => {
+    setSearchQ('');
+    setStatusActive(true);
+    setStatusWithdraw(true);
+  };
+
+  const exportExcel = async () => {
+    try {
+      const qs = queryString();
+      const res = await api(
+        `/system-admin/facilities/export${qs ? `?${qs}` : ''}`,
+        { raw: true },
+        'system'
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'facilities.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    }
+  };
 
   const closeModal = () => {
     setOpen(false);
@@ -237,6 +291,45 @@ export default function FacilitiesPage() {
           </button>
         </div>
 
+        <section className="filter-box">
+          <div className="filter-row">
+            <span className="filter-label">시설사명</span>
+            <input
+              placeholder="시설사명 또는 시설사 코드"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              style={{ minWidth: 280, flex: 1 }}
+            />
+          </div>
+          <div className="filter-row">
+            <span className="filter-label">상태</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={statusActive}
+                onChange={(e) => setStatusActive(e.target.checked)}
+              />
+              활성화
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={statusWithdraw}
+                onChange={(e) => setStatusWithdraw(e.target.checked)}
+              />
+              탈퇴
+            </label>
+          </div>
+          <div className="filter-actions">
+            <button type="button" className="btn-ghost" onClick={exportExcel}>
+              엑셀 다운로드
+            </button>
+            <button type="button" className="btn-ghost" onClick={resetFilters}>
+              초기화
+            </button>
+          </div>
+        </section>
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -252,10 +345,18 @@ export default function FacilitiesPage() {
               </tr>
             </thead>
             <tbody>
-              {facilities.map((f) => {
+              {facilities.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="empty-list">
+                    검색 조건에 해당하는 시설사가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                facilities.map((f) => {
                 const customerPath = f.links?.customer || `/w/${f.facilityCode}`;
                 const adminPath = f.links?.admin || `/admin/${f.facilityCode}/login`;
                 const signagePath = f.links?.signage || `/signage/${f.facilityCode}`;
+                const isActive = f.status !== 'withdraw' && f.status !== 'inactive';
                 return (
                   <tr key={f.id || f.facilityCode}>
                     <td>{f.name}</td>
@@ -301,10 +402,19 @@ export default function FacilitiesPage() {
                     </td>
                     <td>{Number(f.kakaoUnitCost || 0).toLocaleString()}원</td>
                     <td>{formatDateTime(f.createdAt)}</td>
-                    <td>{f.statusLabel || f.status}</td>
+                    <td>
+                      <span
+                        className={`facility-status-badge ${
+                          isActive ? 'is-active' : 'is-withdraw'
+                        }`}
+                      >
+                        {f.statusLabel || (isActive ? '활성' : '탈퇴')}
+                      </span>
+                    </td>
                   </tr>
                 );
-              })}
+              })
+              )}
             </tbody>
           </table>
         </div>

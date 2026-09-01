@@ -188,6 +188,11 @@ router.get(
   requireAuth(['system_admin']),
   facilityController.list
 );
+router.get(
+  '/system-admin/facilities/export',
+  requireAuth(['system_admin']),
+  facilityController.exportFacilities
+);
 router.post(
   '/system-admin/facilities',
   requireAuth(['system_admin']),

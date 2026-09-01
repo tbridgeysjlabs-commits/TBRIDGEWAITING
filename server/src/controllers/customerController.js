@@ -1,13 +1,16 @@
-import { customerService } from '../services/customerService.js';
+import {
+  customerService,
+  parseCustomerListQuery,
+} from '../services/customerService.js';
 
 export const customerController = {
   async listFacility(req, res, next) {
     try {
       res.json(
-        await customerService.listByFacility(req.params.facilityCode, {
-          page: Number(req.query.page || 1),
-          pageSize: Number(req.query.pageSize || 20),
-        })
+        await customerService.listByFacility(
+          req.params.facilityCode,
+          parseCustomerListQuery(req.query)
+        )
       );
     } catch (err) {
       next(err);
@@ -16,15 +19,7 @@ export const customerController = {
 
   async listSystem(req, res, next) {
     try {
-      res.json(
-        await customerService.listAll(
-          { facilityName: req.query.facilityName },
-          {
-            page: Number(req.query.page || 1),
-            pageSize: Number(req.query.pageSize || 20),
-          }
-        )
-      );
+      res.json(await customerService.listAll(parseCustomerListQuery(req.query)));
     } catch (err) {
       next(err);
     }
