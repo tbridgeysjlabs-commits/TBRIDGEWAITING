@@ -130,27 +130,6 @@ export default function FacilitiesPage() {
     setAppliedWithdraw(true);
   };
 
-  const exportExcel = async () => {
-    try {
-      const qs = queryString();
-      const res = await api(
-        `/system-admin/facilities/export${qs ? `?${qs}` : ''}`,
-        { raw: true },
-        'system'
-      );
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'facilities.xlsx';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setToast(e.message);
-      setTimeout(() => setToast(''), 2500);
-    }
-  };
-
   const closeModal = () => {
     setOpen(false);
     setMode('create');
@@ -332,9 +311,6 @@ export default function FacilitiesPage() {
             </label>
           </div>
           <div className="filter-actions">
-            <button type="button" className="btn-ghost" onClick={exportExcel}>
-              엑셀 다운로드
-            </button>
             <button type="button" className="btn-dark" onClick={runSearch}>
               검색
             </button>
