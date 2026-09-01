@@ -71,4 +71,40 @@ export const customerService = {
       pageSize,
     };
   },
+
+  async exportExcel({ facilityCode, ids }) {
+    const ExcelJS = (await import('exceljs')).default;
+    let rows = [];
+    if (ids?.length) {
+      rows = await customerRepository.listByIds(ids);
+      if (facilityCode) {
+        const facility = await facilityRepository.findByCode(facilityCode);
+        if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+        rows = rows.filter((r) => r.facility_id === facility.id);
+      }
+    } else {
+      throw createError(400, '선택된 항목이 없습니다.');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('고객');
+    sheet.columns = [
+      { header: '시설사명', key: 'facilityName', width: 20 },
+      { header: '등록일시', key: 'registeredAt', width: 22 },
+      { header: '전화번호', key: 'phone', width: 16 },
+      { header: '마케팅 동의 여부', key: 'marketing', width: 24 },
+    ];
+    for (const r of rows) {
+      const mapped = mapCustomer(r);
+      sheet.addRow({
+        facilityName: mapped.facilityName,
+        registeredAt: mapped.registeredAt,
+        phone: mapped.phoneDisplay,
+        marketing: mapped.marketingAgreed
+          ? `동의 (${mapped.marketingAgreedAt || ''})`
+          : '미동의',
+      });
+    }
+    return workbook.xlsx.writeBuffer();
+  },
 };

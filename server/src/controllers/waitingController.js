@@ -6,6 +6,15 @@ function parseStatuses(query) {
   return String(query.statuses).split(',').filter(Boolean);
 }
 
+function parseIds(query) {
+  if (!query?.ids) return [];
+  if (Array.isArray(query.ids)) return query.ids.map(String).filter(Boolean);
+  return String(query.ids)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const waitingController = {
   async board(req, res, next) {
     try {
@@ -130,6 +139,7 @@ export const waitingController = {
         totalCount: req.query.totalCount,
         dailySeq: req.query.dailySeq,
         statuses: parseStatuses(req.query),
+        ids: parseIds(req.query),
       });
       res.setHeader(
         'Content-Type',
@@ -152,6 +162,7 @@ export const waitingController = {
         totalCount: req.query.totalCount,
         dailySeq: req.query.dailySeq,
         statuses: parseStatuses(req.query),
+        ids: parseIds(req.query),
       });
       res.setHeader(
         'Content-Type',

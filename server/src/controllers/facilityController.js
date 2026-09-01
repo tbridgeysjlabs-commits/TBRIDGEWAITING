@@ -274,6 +274,19 @@ export const facilityController = {
     }
   },
 
+  async resendKakao(req, res, next) {
+    try {
+      res.json(
+        await facilityService.resendKakao(
+          req.params.facilityCode,
+          req.params.usageId
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async listCharges(req, res, next) {
     try {
       res.json(

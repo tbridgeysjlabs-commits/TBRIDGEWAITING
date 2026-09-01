@@ -106,6 +106,10 @@ async function migrate() {
   await addColumn('usage_history', 'receipt_url', `TEXT`);
   await addColumn('usage_history', 'cancelled_at', 'TIMESTAMPTZ');
   await addColumn('usage_history', 'cancelled_amount', 'NUMERIC(12,2)');
+  await addColumn('usage_history', 'send_payload', 'JSONB');
+  await addColumn('usage_history', 'last_resend_at', 'TIMESTAMPTZ');
+  await addColumn('usage_history', 'last_resend_status', `VARCHAR(20)`);
+  await addColumn('usage_history', 'last_resend_error', 'TEXT');
 
   await addColumn(
     'facility_settings',

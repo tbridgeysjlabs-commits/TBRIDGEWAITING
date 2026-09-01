@@ -2,6 +2,7 @@ import { query } from '../db/pool.js';
 import { billingRepository } from '../repositories/billingRepository.js';
 import { facilityRepository } from '../repositories/facilityRepository.js';
 import { waitingRepository } from '../repositories/waitingRepository.js';
+import { createError } from '../middleware/errorHandler.js';
 import { isPpurioConfigured, sendAlimtalk } from './ppurioClient.js';
 import {
   TEMPLATE,
@@ -85,6 +86,7 @@ export const kakaoService = {
         templateName,
         recipientPhone: waiting.phone,
         note: '충전금액 소진으로 발송 실패',
+        sendPayload: { templateKey, templateName, to: waiting.phone },
       });
       return withReason({
         ok: false,
@@ -175,6 +177,7 @@ export const kakaoService = {
         templateName: `${templateName} (MOCK)`,
         recipientPhone: waiting.phone,
         sendStatus: 'success',
+        sendPayload: payload,
       });
       const warningThreshold = Number(
         after?.kakao_warning_threshold ?? facility.kakao_warning_threshold ?? 1000
@@ -198,6 +201,7 @@ export const kakaoService = {
         templateName,
         recipientPhone: waiting.phone,
         note: sendResult.message || '알림톡 발송 예외',
+        sendPayload: payload,
       });
       await query(
         `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
@@ -224,6 +228,7 @@ export const kakaoService = {
         templateName,
         recipientPhone: waiting.phone,
         note: sendResult.message || '알림톡 발송 실패',
+        sendPayload: payload,
       });
       await query(
         `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
@@ -254,6 +259,7 @@ export const kakaoService = {
       templateName,
       recipientPhone: waiting.phone,
       sendStatus: 'success',
+      sendPayload: payload,
     });
 
     const warningThreshold = Number(
@@ -522,5 +528,175 @@ export const kakaoService = {
         error: String(err?.message || err),
       });
     }
+  },
+
+  /**
+   * usage_history 원본 페이로드(동일 템플릿/변수)로 재발송.
+   * isResend=Y 로 Ppurio 호출. 성공/실패를 last_resend_* 에 기록하고 과금 이력도 추가.
+   */
+  async resendFromUsage(usageId, { facilityCode } = {}) {
+    const usage = await billingRepository.findUsageById(usageId);
+    if (!usage || usage.type !== 'send') {
+      throw createError(404, '발송 내역을 찾을 수 없습니다.');
+    }
+    if (facilityCode && usage.facility_code !== facilityCode) {
+      throw createError(403, '해당 시설사의 발송 내역이 아닙니다.');
+    }
+
+    const facility = await facilityRepository.findById(usage.facility_id);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+
+    let payload = usage.send_payload;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = null;
+      }
+    }
+    if (!payload || typeof payload !== 'object') {
+      const { rows } = await query(
+        `SELECT payload FROM notification_logs
+         WHERE facility_id = $1 AND waiting_id = $2
+         ORDER BY created_at DESC NULLS LAST
+         LIMIT 1`,
+        [usage.facility_id, usage.waiting_id]
+      );
+      payload = rows[0]?.payload || null;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          payload = null;
+        }
+      }
+    }
+    if (!payload?.templateCode && !payload?.templateKey) {
+      await billingRepository.updateResendResult(usageId, {
+        status: 'fail',
+        error: '원본 발송 정보가 없어 재발송할 수 없습니다.',
+      });
+      throw createError(400, '원본 발송 정보가 없어 재발송할 수 없습니다.');
+    }
+
+    const templateKey = payload.templateKey || null;
+    const templateName =
+      payload.templateName || usage.template_name || templateDisplayName(templateKey) || '알림톡';
+    const templateCode = payload.templateCode || getTemplateCode(templateKey);
+    const to = payload.to || usage.recipient_phone;
+    const changeWord = payload.changeWord || {};
+    const refKey = `r_${String(usage.id || '').replace(/-/g, '').slice(0, 24)}`;
+    const unitCost = Number(facility.kakao_unit_cost || 20);
+    const balance = Number(facility.kakao_balance || 0);
+
+    if (!to) {
+      await billingRepository.updateResendResult(usageId, {
+        status: 'fail',
+        error: '수신번호가 없습니다.',
+      });
+      throw createError(400, '수신번호가 없습니다.');
+    }
+    if (!templateCode) {
+      await billingRepository.updateResendResult(usageId, {
+        status: 'fail',
+        error: '템플릿 코드가 없습니다.',
+      });
+      throw createError(400, '템플릿 코드가 없습니다.');
+    }
+    if (balance < unitCost) {
+      await billingRepository.updateResendResult(usageId, {
+        status: 'fail',
+        error: '충전금액이 소진되어 재발송할 수 없습니다.',
+      });
+      await billingRepository.logFailedSend(facility.id, usage.waiting_id, unitCost, {
+        templateName: `${templateName} (재발송)`,
+        recipientPhone: to,
+        note: '충전금액 소진으로 재발송 실패',
+        sendPayload: payload,
+      });
+      throw createError(400, '충전금액이 소진되어 재발송할 수 없습니다.');
+    }
+
+    const useLive = isPpurioConfigured();
+    const resendPayload = {
+      ...payload,
+      templateKey,
+      templateName,
+      templateCode,
+      to,
+      changeWord,
+      refKey,
+      live: useLive,
+      isResend: true,
+    };
+
+    let sendResult = { ok: true, mock: !useLive };
+    if (useLive) {
+      try {
+        sendResult = await sendAlimtalk({
+          to,
+          templateCode,
+          changeWord,
+          refKey,
+          isResend: 'Y',
+        });
+        resendPayload.ppurio = {
+          ok: sendResult.ok,
+          code: sendResult.code,
+          messagekey: sendResult.messagekey,
+          error: sendResult.message,
+        };
+      } catch (err) {
+        sendResult = {
+          ok: false,
+          exception: true,
+          message: String(err?.message || err),
+        };
+        resendPayload.ppurio = sendResult;
+      }
+    }
+
+    if (!useLive || sendResult.ok) {
+      await billingRepository.deductForSend(facility.id, usage.waiting_id, unitCost, {
+        templateName: `${templateName} (재발송${useLive ? '' : ' MOCK'})`,
+        recipientPhone: to,
+        sendStatus: 'success',
+        note: '카카오 알림톡 재발송',
+        sendPayload: resendPayload,
+      });
+      await query(
+        `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+         VALUES ($1, $2, 'kakao', $3, 'sent')`,
+        [facility.id, usage.waiting_id, JSON.stringify(resendPayload)]
+      );
+      const updated = await billingRepository.updateResendResult(usageId, {
+        status: 'success',
+        error: null,
+      });
+      return {
+        ok: true,
+        mock: !useLive,
+        item: updated,
+        message: useLive ? '재발송에 성공했습니다.' : '재발송 완료 (MOCK)',
+      };
+    }
+
+    const errMsg = sendResult.message || '재발송에 실패했습니다.';
+    await billingRepository.logFailedSend(facility.id, usage.waiting_id, unitCost, {
+      templateName: `${templateName} (재발송)`,
+      recipientPhone: to,
+      note: errMsg,
+      sendPayload: resendPayload,
+    });
+    await query(
+      `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+       VALUES ($1, $2, 'kakao', $3, 'failed')`,
+      [facility.id, usage.waiting_id, JSON.stringify(resendPayload)]
+    );
+    await billingRepository.updateResendResult(usageId, {
+      status: 'fail',
+      error: errMsg,
+    });
+    throw createError(400, errMsg);
   },
 };

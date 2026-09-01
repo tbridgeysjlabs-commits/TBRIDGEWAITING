@@ -125,6 +125,21 @@ export const customerRepository = {
     return { rows, total: count.rows[0].total, page, pageSize };
   },
 
+  async listByIds(ids = []) {
+    const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    if (!list.length) return [];
+    const { rows } = await query(
+      `SELECT c.*, f.name AS facility_name, f.facility_code,
+              ${REGISTERED_AT_EXPR} AS registered_at
+       FROM customers c
+       JOIN facilities f ON f.id = c.facility_id
+       WHERE c.id = ANY($1::uuid[])
+       ORDER BY registered_at DESC NULLS LAST`,
+      [list]
+    );
+    return rows;
+  },
+
   async listAll(filters = {}) {
     const page = Math.max(1, Number(filters.page) || 1);
     const pageSize = Math.min(1000, Math.max(1, Number(filters.pageSize) || 500));

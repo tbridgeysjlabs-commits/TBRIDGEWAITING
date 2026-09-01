@@ -35,7 +35,10 @@ function buildHistoryWhere(filters, startIndex = 1) {
     clauses.push(`w.daily_seq = $${i++}`);
     params.push(Number(filters.dailySeq));
   }
-  if (filters.statuses?.length) {
+  if (filters.ids?.length) {
+    clauses.push(`w.id = ANY($${i++}::uuid[])`);
+    params.push(filters.ids);
+  } else if (filters.statuses?.length) {
     const expanded = [];
     for (const s of filters.statuses) {
       if (s === 'cancelled') expanded.push(...CANCELLED_STATUSES);

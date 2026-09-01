@@ -143,6 +143,12 @@ router.get(
   customerController.listFacility
 );
 router.get(
+  '/admin/:facilityCode/customers/export',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  customerController.exportFacility
+);
+router.get(
   '/admin/:facilityCode/billing',
   requireAuth(['facility_admin', 'system_admin']),
   requireFacilityMatch(),
@@ -168,6 +174,12 @@ router.get(
   requireAuth(['facility_admin', 'system_admin']),
   requireFacilityMatch(),
   facilityController.listSends
+);
+router.post(
+  '/admin/:facilityCode/billing/sends/:usageId/resend',
+  requireAuth(['facility_admin', 'system_admin']),
+  requireFacilityMatch(),
+  facilityController.resendKakao
 );
 router.get(
   '/admin/:facilityCode/billing/charges',
@@ -217,6 +229,11 @@ router.get(
   '/system-admin/customers',
   requireAuth(['system_admin']),
   customerController.listSystem
+);
+router.get(
+  '/system-admin/customers/export',
+  requireAuth(['system_admin']),
+  customerController.exportSystem
 );
 router.get(
   '/system-admin/billing/sends',

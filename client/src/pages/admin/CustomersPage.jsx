@@ -11,56 +11,71 @@ import {
 } from '../../utils/searchPresets';
 import { formatDateTimeShortKst } from '../../utils/datetime.js';
 
+const DEFAULT_FILTERS = {
+  preset: 'all',
+  startDate: '',
+  endDate: '',
+  agreed: true,
+  notAgreed: true,
+  phone: '',
+};
+
+function buildCustomerQs(filters) {
+  const range = resolveSearchRange(filters.preset, filters.startDate, filters.endDate);
+  const marketing = [];
+  if (filters.agreed) marketing.push('agreed');
+  if (filters.notAgreed) marketing.push('not_agreed');
+  const params = new URLSearchParams();
+  if (range.startDate) params.set('startDate', range.startDate);
+  if (range.endDate) params.set('endDate', range.endDate);
+  if (marketing.length) params.set('marketing', marketing.join(','));
+  if (filters.phone) params.set('phone', filters.phone);
+  if (filters.facilityName?.trim()) {
+    params.set('facilityName', filters.facilityName.trim());
+  }
+  params.set('pageSize', '500');
+  return params.toString();
+}
+
+async function downloadBlob(res, filename) {
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function CustomersPage() {
   const { facilityCode } = useParams();
   const { facilityUser, logoutFacility } = useAuth();
   const navigate = useNavigate();
   const { collapsed, toggle } = useSidebarCollapse('tb_admin_sidebar');
   const [data, setData] = useState({ items: [], total: 0 });
+  const [selected, setSelected] = useState([]);
   const [toast, setToast] = useState('');
-
-  const [preset, setPreset] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [agreed, setAgreed] = useState(true);
-  const [notAgreed, setNotAgreed] = useState(true);
-  const [phone, setPhone] = useState('');
-
-  const marketingParam = useMemo(() => {
-    const list = [];
-    if (agreed) list.push('agreed');
-    if (notAgreed) list.push('not_agreed');
-    return list.join(',');
-  }, [agreed, notAgreed]);
-
-  const queryString = useCallback(() => {
-    const range = resolveSearchRange(preset, startDate, endDate);
-    const params = new URLSearchParams();
-    if (range.startDate) params.set('startDate', range.startDate);
-    if (range.endDate) params.set('endDate', range.endDate);
-    if (marketingParam) params.set('marketing', marketingParam);
-    if (phone) params.set('phone', phone);
-    params.set('pageSize', '500');
-    return params.toString();
-  }, [preset, startDate, endDate, marketingParam, phone]);
+  const [draft, setDraft] = useState(DEFAULT_FILTERS);
+  const [applied, setApplied] = useState(DEFAULT_FILTERS);
 
   const load = useCallback(async () => {
     if (!facilityUser || facilityUser.facilityCode !== facilityCode) return;
     try {
-      const result = await api(`/admin/${facilityCode}/customers?${queryString()}`);
+      const result = await api(
+        `/admin/${facilityCode}/customers?${buildCustomerQs(applied)}`
+      );
       setData(result);
+      setSelected([]);
     } catch (e) {
       setData({ items: [], total: 0 });
+      setSelected([]);
       setToast(e.message);
       setTimeout(() => setToast(''), 2500);
     }
-  }, [facilityCode, facilityUser, queryString]);
+  }, [facilityCode, facilityUser, applied]);
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      load();
-    }, 200);
-    return () => clearTimeout(id);
+    load();
   }, [load]);
 
   if (!facilityUser || facilityUser.facilityCode !== facilityCode) {
@@ -68,24 +83,51 @@ export default function CustomersPage() {
   }
 
   const applyPreset = (key) => {
-    setPreset(key);
-    setStartDate('');
-    setEndDate('');
+    setDraft((d) => ({ ...d, preset: key, startDate: '', endDate: '' }));
   };
 
   const onCustomDate = (which, value) => {
-    setPreset('');
-    if (which === 'start') setStartDate(value);
-    else setEndDate(value);
+    setDraft((d) => ({
+      ...d,
+      preset: '',
+      startDate: which === 'start' ? value : d.startDate,
+      endDate: which === 'end' ? value : d.endDate,
+    }));
   };
 
+  const search = () => setApplied({ ...draft });
+
   const reset = () => {
-    setPreset('all');
-    setStartDate('');
-    setEndDate('');
-    setAgreed(true);
-    setNotAgreed(true);
-    setPhone('');
+    setDraft(DEFAULT_FILTERS);
+    setApplied(DEFAULT_FILTERS);
+  };
+
+  const pageIds = useMemo(() => data.items.map((i) => i.id), [data.items]);
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+
+  const toggleAll = () => {
+    if (allSelected) setSelected((s) => s.filter((id) => !pageIds.includes(id)));
+    else setSelected((s) => [...new Set([...s, ...pageIds])]);
+  };
+
+  const exportExcel = async () => {
+    if (!selected.length) {
+      setToast('선택된 항목이 없습니다');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    try {
+      const params = new URLSearchParams();
+      params.set('ids', selected.join(','));
+      const res = await api(
+        `/admin/${facilityCode}/customers/export?${params}`,
+        { raw: true }
+      );
+      await downloadBlob(res, 'customers.xlsx');
+    } catch (e) {
+      setToast(e.message);
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   return (
@@ -111,7 +153,7 @@ export default function CustomersPage() {
                 <button
                   key={p.key}
                   type="button"
-                  className={`chip ${preset === p.key ? 'active' : ''}`}
+                  className={`chip ${draft.preset === p.key ? 'active' : ''}`}
                   onClick={() => applyPreset(p.key)}
                 >
                   {p.label}
@@ -120,13 +162,13 @@ export default function CustomersPage() {
             </div>
             <input
               type="date"
-              value={startDate}
+              value={draft.startDate}
               onChange={(e) => onCustomDate('start', e.target.value)}
             />
             <span>~</span>
             <input
               type="date"
-              value={endDate}
+              value={draft.endDate}
               onChange={(e) => onCustomDate('end', e.target.value)}
             />
           </div>
@@ -136,16 +178,16 @@ export default function CustomersPage() {
             <label>
               <input
                 type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
+                checked={draft.agreed}
+                onChange={(e) => setDraft({ ...draft, agreed: e.target.checked })}
               />
               동의
             </label>
             <label>
               <input
                 type="checkbox"
-                checked={notAgreed}
-                onChange={(e) => setNotAgreed(e.target.checked)}
+                checked={draft.notAgreed}
+                onChange={(e) => setDraft({ ...draft, notAgreed: e.target.checked })}
               />
               미동의
             </label>
@@ -157,23 +199,50 @@ export default function CustomersPage() {
               type="tel"
               inputMode="numeric"
               placeholder="숫자만 입력"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+              value={draft.phone}
+              onChange={(e) =>
+                setDraft({ ...draft, phone: e.target.value.replace(/\D/g, '') })
+              }
               style={{ minWidth: 220 }}
             />
           </div>
 
           <div className="filter-actions">
+            <button type="button" className="btn-dark" onClick={search}>
+              검색
+            </button>
             <button type="button" className="btn-ghost" onClick={reset}>
               초기화
             </button>
           </div>
         </section>
 
+        <div className="list-toolbar">
+          <span>
+            총 {data.total} / 선택 {selected.length}
+          </span>
+          <button
+            type="button"
+            className="btn-dark"
+            onClick={exportExcel}
+            disabled={!selected.length}
+          >
+            엑셀 다운로드
+          </button>
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="전체 선택"
+                  />
+                </th>
                 <th>등록일시</th>
                 <th>전화번호</th>
                 <th>마케팅 동의 여부</th>
@@ -182,13 +251,26 @@ export default function CustomersPage() {
             <tbody>
               {data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="empty-list">
+                  <td colSpan={4} className="empty-list">
                     검색 조건에 해당하는 고객이 없습니다.
                   </td>
                 </tr>
               ) : (
                 data.items.map((item) => (
                   <tr key={item.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(item.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelected((s) => [...s, item.id]);
+                          } else {
+                            setSelected((s) => s.filter((id) => id !== item.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td>{formatDateTime(item.registeredAt)}</td>
                     <td>{item.phoneDisplay}</td>
                     <td>

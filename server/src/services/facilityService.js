@@ -812,6 +812,9 @@ export const facilityService = {
       cardNo: raw.CardNo || null,
       goodsName: raw.GoodsName || null,
       resultMsg: raw.ResultMsg || null,
+      lastResendAt: row.last_resend_at || null,
+      lastResendStatus: row.last_resend_status || null,
+      lastResendError: row.last_resend_error || null,
     };
   },
 
@@ -917,6 +920,26 @@ export const facilityService = {
       totalCost: result.totalCost,
       page: pagination.page || 1,
       pageSize: pagination.pageSize || 50,
+    };
+  },
+
+  async resendKakao(facilityCode, usageId) {
+    const { kakaoService } = await import('./kakaoService.js');
+    const result = await kakaoService.resendFromUsage(usageId, { facilityCode });
+    const row = result.item
+      ? this.mapUsageRow({
+          ...result.item,
+          facility_name: result.item.facility_name,
+          facility_code: facilityCode,
+        })
+      : null;
+    // 최신 usage 재조회
+    const fresh = await billingRepository.findUsageById(usageId);
+    return {
+      ok: result.ok,
+      mock: result.mock,
+      message: result.message,
+      item: fresh ? this.mapUsageRow(fresh) : row,
     };
   },
 

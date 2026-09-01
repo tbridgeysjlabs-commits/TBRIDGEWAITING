@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
 import { launchNicepay } from '../../lib/nicepay';
 import PaymentReceiptModal from '../../components/billing/PaymentReceiptModal';
+import { formatDateTimeShortKst } from '../../utils/datetime.js';
 
 const PAGE_SIZES = [10, 30, 50, 100, 200];
 const PRESETS = [10000, 50000, 100000, 1000000];
@@ -34,6 +35,7 @@ export default function BillingPage() {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [toast, setToast] = useState('');
+  const [resendingId, setResendingId] = useState(null);
   const [receiptItem, setReceiptItem] = useState(null);
 
   const loadBilling = async () => {
@@ -60,6 +62,30 @@ export default function BillingPage() {
     if (startDate) params.set('startDate', startDate);
     if (endDate) params.set('endDate', endDate);
     setCharges(await api(`/admin/${facilityCode}/billing/charges?${params}`));
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  const resendKakao = async (item) => {
+    if (!item?.id || resendingId) return;
+    setResendingId(item.id);
+    try {
+      const result = await api(
+        `/admin/${facilityCode}/billing/sends/${item.id}/resend`,
+        { method: 'POST', body: JSON.stringify({}) }
+      );
+      showToast(result.message || '재발송 완료');
+      await loadSends();
+      await loadBilling();
+    } catch (e) {
+      showToast(e.message || '재발송에 실패했습니다.');
+      await loadSends();
+    } finally {
+      setResendingId(null);
+    }
   };
 
   useEffect(() => {
@@ -253,6 +279,7 @@ export default function BillingPage() {
                     <th>수신번호</th>
                     <th>발송 성공 여부</th>
                     <th>충전금</th>
+                    <th>카카오 알림톡 재발송</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -267,11 +294,41 @@ export default function BillingPage() {
                           ? '0'
                           : `-${Number(item.amount || item.unitCost || 0)}`}
                       </td>
+                      <td>
+                        <div className="kakao-resend-cell">
+                          <button
+                            type="button"
+                            className="btn-ghost mini"
+                            disabled={!!resendingId}
+                            onClick={() => resendKakao(item)}
+                          >
+                            {resendingId === item.id ? '재발송 중…' : '재발송'}
+                          </button>
+                          {item.lastResendAt && (
+                            <span
+                              className={`kakao-resend-badge ${
+                                item.lastResendStatus === 'success'
+                                  ? 'is-success'
+                                  : 'is-fail'
+                              }`}
+                              title={
+                                item.lastResendStatus === 'fail'
+                                  ? item.lastResendError || '재발송 실패'
+                                  : '재발송 성공'
+                              }
+                            >
+                              {item.lastResendStatus === 'success'
+                                ? `재발송 성공 (${formatDateTimeShortKst(item.lastResendAt)})`
+                                : `재발송 실패 (${formatDateTimeShortKst(item.lastResendAt)})`}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {!sends.items.length && (
                     <tr>
-                      <td colSpan={5}>발송 내역이 없습니다.</td>
+                      <td colSpan={6}>발송 내역이 없습니다.</td>
                     </tr>
                   )}
                 </tbody>

@@ -1044,9 +1044,97 @@ a {
   color: #2e7d32;
 }
 
-.facility-status-badge.is-withdraw {
-  background: #f3f3f6;
-  color: #6d6d76;
+.facility-search-input {
+  position: relative;
+  min-width: 200px;
+  flex: 1;
+}
+
+.facility-search-dropdown {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e0e0da;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(21, 22, 26, 0.12);
+}
+
+.facility-search-dropdown li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #15161a;
+}
+
+.facility-search-dropdown li button:hover {
+  background: #f5f5f3;
+}
+
+.facility-search-name {
+  font-weight: 600;
+}
+
+.facility-search-code {
+  color: #8a8a92;
+  font-size: 12px;
+}
+
+.facility-search-empty {
+  padding: 10px 12px;
+  color: #8a8a92;
+  font-size: 12.5px;
+}
+
+.kakao-resend-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.kakao-resend-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: default;
+}
+
+.kakao-resend-badge.is-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.kakao-resend-badge.is-fail {
+  background: #fdecea;
+  color: #c62828;
+}
+
+.btn-ghost.mini {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
 .empty-list {

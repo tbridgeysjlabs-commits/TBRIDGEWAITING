@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
+import FacilitySearchInput from '../../components/admin/FacilitySearchInput';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -208,10 +209,12 @@ export default function SystemBillingPage() {
         </div>
 
         <div className="filter-row" style={{ marginBottom: 16 }}>
-          <input
+          <FacilitySearchInput
             placeholder="시설사명"
             value={facilityName}
-            onChange={(e) => setFacilityName(e.target.value)}
+            onChange={setFacilityName}
+            valueMode="name"
+            style={{ minWidth: 200 }}
           />
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <span>~</span>

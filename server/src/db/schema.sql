@@ -148,6 +148,13 @@ CREATE TABLE IF NOT EXISTS usage_history (
   pg_tid VARCHAR(40),
   pg_moid VARCHAR(64),
   note TEXT,
+  template_name VARCHAR(200),
+  recipient_phone VARCHAR(30),
+  send_status VARCHAR(20),
+  send_payload JSONB,
+  last_resend_at TIMESTAMPTZ,
+  last_resend_status VARCHAR(20),
+  last_resend_error TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

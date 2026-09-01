@@ -117,15 +117,12 @@ export default function HistoryPage() {
     setPage(1);
   };
 
-  const toggleAll = () => {
-    if (selected.length === data.items.length) setSelected([]);
-    else setSelected(data.items.map((i) => i.id));
-  };
-
   const exportExcel = async () => {
     try {
+      const params = new URLSearchParams(queryString());
+      if (selected.length) params.set('ids', selected.join(','));
       const res = await api(
-        `/admin/${facilityCode}/history/export?${queryString()}`,
+        `/admin/${facilityCode}/history/export?${params}`,
         { raw: true }
       );
       const blob = await res.blob();
@@ -138,6 +135,15 @@ export default function HistoryPage() {
     } catch (e) {
       setToast(e.message);
     }
+  };
+
+  const pageIds = data.items.map((i) => i.id);
+  const allSelected =
+    pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+
+  const toggleAllHeader = () => {
+    if (allSelected) setSelected((s) => s.filter((id) => !pageIds.includes(id)));
+    else setSelected((s) => [...new Set([...s, ...pageIds])]);
   };
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
@@ -249,9 +255,6 @@ export default function HistoryPage() {
           <span>
             총 {data.total} / 선택 {selected.length}
           </span>
-          <button type="button" className="btn-ghost" onClick={toggleAll}>
-            전체 선택
-          </button>
           <button type="button" className="btn-dark" onClick={exportExcel}>
             엑셀 다운로드
           </button>
@@ -261,7 +264,14 @@ export default function HistoryPage() {
           <table>
             <thead>
               <tr>
-                <th>선택</th>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAllHeader}
+                    aria-label="전체 선택"
+                  />
+                </th>
                 <th>입장일</th>
                 <th>연락처</th>
                 <th>인원 수</th>

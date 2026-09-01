@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
+import FacilitySearchInput from '../../components/admin/FacilitySearchInput';
 import PasswordChecklist from '../../components/PasswordChecklist';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
@@ -77,6 +78,9 @@ export default function FacilitiesPage() {
   const [searchQ, setSearchQ] = useState('');
   const [statusActive, setStatusActive] = useState(true);
   const [statusWithdraw, setStatusWithdraw] = useState(true);
+  const [appliedQ, setAppliedQ] = useState('');
+  const [appliedActive, setAppliedActive] = useState(true);
+  const [appliedWithdraw, setAppliedWithdraw] = useState(true);
 
   const dirty = useMemo(() => {
     if (!open || mode !== 'edit') return false;
@@ -85,17 +89,17 @@ export default function FacilitiesPage() {
 
   const statusesParam = useMemo(() => {
     const list = [];
-    if (statusActive) list.push('active');
-    if (statusWithdraw) list.push('withdraw');
+    if (appliedActive) list.push('active');
+    if (appliedWithdraw) list.push('withdraw');
     return list.join(',');
-  }, [statusActive, statusWithdraw]);
+  }, [appliedActive, appliedWithdraw]);
 
   const queryString = useCallback(() => {
     const params = new URLSearchParams();
-    if (searchQ.trim()) params.set('q', searchQ.trim());
+    if (appliedQ.trim()) params.set('q', appliedQ.trim());
     if (statusesParam) params.set('statuses', statusesParam);
     return params.toString();
-  }, [searchQ, statusesParam]);
+  }, [appliedQ, statusesParam]);
 
   const load = useCallback(() => {
     const qs = queryString();
@@ -108,16 +112,22 @@ export default function FacilitiesPage() {
 
   useEffect(() => {
     if (!systemUser) return;
-    const id = setTimeout(() => {
-      load().catch((e) => setToast(e.message));
-    }, 200);
-    return () => clearTimeout(id);
+    load().catch((e) => setToast(e.message));
   }, [systemUser, load]);
+
+  const runSearch = () => {
+    setAppliedQ(searchQ);
+    setAppliedActive(statusActive);
+    setAppliedWithdraw(statusWithdraw);
+  };
 
   const resetFilters = () => {
     setSearchQ('');
     setStatusActive(true);
     setStatusWithdraw(true);
+    setAppliedQ('');
+    setAppliedActive(true);
+    setAppliedWithdraw(true);
   };
 
   const exportExcel = async () => {
@@ -294,10 +304,11 @@ export default function FacilitiesPage() {
         <section className="filter-box">
           <div className="filter-row">
             <span className="filter-label">시설사명</span>
-            <input
+            <FacilitySearchInput
               placeholder="시설사명 또는 시설사 코드"
               value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
+              onChange={setSearchQ}
+              valueMode="nameOrCode"
               style={{ minWidth: 280, flex: 1 }}
             />
           </div>
@@ -323,6 +334,9 @@ export default function FacilitiesPage() {
           <div className="filter-actions">
             <button type="button" className="btn-ghost" onClick={exportExcel}>
               엑셀 다운로드
+            </button>
+            <button type="button" className="btn-dark" onClick={runSearch}>
+              검색
             </button>
             <button type="button" className="btn-ghost" onClick={resetFilters}>
               초기화

@@ -6,34 +6,15 @@ import {
   formatDateYYMMDD,
   formatDuration,
 } from '../../api/client';
+import FacilitySearchInput from '../../components/admin/FacilitySearchInput';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebarCollapse } from '../../hooks/useSidebarCollapse';
-
-const PRESETS = [
-  { key: 'today', label: '오늘' },
-  { key: '1w', label: '1주일' },
-  { key: '1m', label: '1개월' },
-  { key: '3m', label: '3개월' },
-  { key: '6m', label: '6개월' },
-  { key: '1y', label: '1년' },
-  { key: 'all', label: '전체' },
-];
-
-function toISODate(d) {
-  return d.toISOString().slice(0, 10);
-}
-
-function rangeFromPreset(key) {
-  const end = new Date();
-  const start = new Date();
-  if (key === 'all') return { startDate: '', endDate: '' };
-  if (key === 'today') return { startDate: toISODate(start), endDate: toISODate(end) };
-  const map = { '1w': 7, '1m': 30, '3m': 90, '6m': 180, '1y': 365 };
-  start.setDate(start.getDate() - (map[key] || 0));
-  return { startDate: toISODate(start), endDate: toISODate(end) };
-}
+import {
+  SEARCH_PERIOD_PRESETS,
+  rangeFromPreset,
+} from '../../utils/searchPresets';
 
 export default function SystemHistoryPage() {
   const { systemUser, logoutSystem } = useAuth();
@@ -103,8 +84,10 @@ export default function SystemHistoryPage() {
 
   const exportExcel = async () => {
     try {
+      const params = new URLSearchParams(queryString());
+      if (selected.length) params.set('ids', selected.join(','));
       const res = await api(
-        `/system-admin/history/export?${queryString()}`,
+        `/system-admin/history/export?${params}`,
         { raw: true },
         'system'
       );
@@ -118,6 +101,14 @@ export default function SystemHistoryPage() {
     } catch (e) {
       setToast(e.message);
     }
+  };
+
+  const pageIds = data.items.map((i) => i.id);
+  const allSelected =
+    pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+  const toggleAllHeader = () => {
+    if (allSelected) setSelected((s) => s.filter((id) => !pageIds.includes(id)));
+    else setSelected((s) => [...new Set([...s, ...pageIds])]);
   };
 
   return (
@@ -137,7 +128,7 @@ export default function SystemHistoryPage() {
           <div className="filter-row">
             <span className="filter-label">검색 기간</span>
             <div className="preset-group">
-              {PRESETS.map((p) => (
+              {SEARCH_PERIOD_PRESETS.map((p) => (
                 <button
                   key={p.key}
                   type="button"
@@ -153,14 +144,14 @@ export default function SystemHistoryPage() {
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <div className="filter-row">
-            <label>
-              시설사
-              <input
-                value={facilityName}
-                onChange={(e) => setFacilityName(e.target.value)}
-                placeholder="시설사명 검색"
-              />
-            </label>
+            <span className="filter-label">시설사</span>
+            <FacilitySearchInput
+              value={facilityName}
+              onChange={setFacilityName}
+              placeholder="시설사명 검색"
+              valueMode="name"
+              style={{ minWidth: 220 }}
+            />
             <label>
               <input
                 type="checkbox"
@@ -207,8 +198,23 @@ export default function SystemHistoryPage() {
             >
               검색
             </button>
-            <button type="button" className="btn-ghost" onClick={exportExcel}>
-              엑셀 다운로드
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setPreset('all');
+                setStartDate('');
+                setEndDate('');
+                setFacilityName('');
+                setCompleted(true);
+                setCancelled(true);
+                setPhone('');
+                setTotalCount('');
+                setDailySeq('');
+                setPage(1);
+              }}
+            >
+              초기화
             </button>
           </div>
         </section>
@@ -217,13 +223,23 @@ export default function SystemHistoryPage() {
           <span>
             총 {data.total} / 선택 {selected.length}
           </span>
+          <button type="button" className="btn-dark" onClick={exportExcel}>
+            엑셀 다운로드
+          </button>
         </div>
 
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>선택</th>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAllHeader}
+                    aria-label="전체 선택"
+                  />
+                </th>
                 <th>시설사명</th>
                 <th>입장일</th>
                 <th>연락처</th>

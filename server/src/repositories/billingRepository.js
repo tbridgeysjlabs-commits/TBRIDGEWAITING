@@ -98,17 +98,18 @@ export const billingRepository = {
     await query(
       `INSERT INTO usage_history (
          facility_id, waiting_id, type, amount, unit_cost, balance_after, note,
-         template_name, recipient_phone, send_status
-       ) VALUES ($1, $2, 'send', $3, $3, $4, $5, $6, $7, $8)`,
+         template_name, recipient_phone, send_status, send_payload
+       ) VALUES ($1, $2, 'send', $3, $3, $4, $5, $6, $7, $8, $9)`,
       [
         facilityId,
         waitingId,
         unitCost,
         facility.kakao_balance,
-        '카카오 알림톡 발송',
+        meta.note || '카카오 알림톡 발송',
         meta.templateName || '웨이팅 등록 완료',
         meta.recipientPhone || null,
         meta.sendStatus || 'success',
+        meta.sendPayload ? JSON.stringify(meta.sendPayload) : null,
       ]
     );
     return facility;
@@ -177,8 +178,8 @@ export const billingRepository = {
     await query(
       `INSERT INTO usage_history (
          facility_id, waiting_id, type, amount, unit_cost, note,
-         template_name, recipient_phone, send_status
-       ) VALUES ($1, $2, 'send', 0, $3, $4, $5, $6, 'fail')`,
+         template_name, recipient_phone, send_status, send_payload
+       ) VALUES ($1, $2, 'send', 0, $3, $4, $5, $6, 'fail', $7)`,
       [
         facilityId,
         waitingId,
@@ -186,8 +187,22 @@ export const billingRepository = {
         meta.note || '잔액 부족으로 발송 실패',
         meta.templateName || '웨이팅 등록 완료',
         meta.recipientPhone || null,
+        meta.sendPayload ? JSON.stringify(meta.sendPayload) : null,
       ]
     );
+  },
+
+  async updateResendResult(usageId, { status, error } = {}) {
+    const { rows } = await query(
+      `UPDATE usage_history
+       SET last_resend_at = NOW(),
+           last_resend_status = $2,
+           last_resend_error = $3
+       WHERE id = $1
+       RETURNING *`,
+      [usageId, status || null, error || null]
+    );
+    return rows[0] || null;
   },
 
   async listUsage(filters, { page = 1, pageSize = 50 } = {}) {
