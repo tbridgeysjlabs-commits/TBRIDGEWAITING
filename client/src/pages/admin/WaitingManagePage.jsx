@@ -190,7 +190,7 @@ export default function WaitingManagePage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}
@@ -203,7 +203,12 @@ export default function WaitingManagePage() {
       />
       <main className="admin-main">
         <header className="admin-header">
-          <h1>대기자 관리</h1>
+          <div className="admin-header-text">
+            <h1>대기자 관리</h1>
+            <p className="admin-page-desc">
+              실시간 대기 현황을 확인하고 호출·입장을 처리합니다
+            </p>
+          </div>
           <div className="admin-clock">{now}</div>
         </header>
 
@@ -229,25 +234,28 @@ export default function WaitingManagePage() {
             const isCalling = Boolean(item.calledAt);
             const countdown = formatCountdown(item.callDeadlineAt, nowMs);
             const callMissed = isCalling && !countdown;
+            const isDone = status === 'completed';
 
             return (
               <div
                 key={item.id}
                 className={`waiting-row ${selectedId === item.id ? 'selected' : ''} ${
                   isCalling ? 'calling' : ''
-                }`}
+                } ${isDone ? 'done' : ''}`}
                 onClick={() => setSelectedId(item.id)}
               >
                 <span className="order-circle">{item.order}</span>
-                <span className="seq-badge">{item.dailySeq}번</span>
+                <span className={`seq-badge ${isCalling || isDone ? 'accent' : ''}`}>
+                  {item.dailySeq}번
+                </span>
                 <span className="party-text">인원 {item.totalCount}명</span>
-                <span>{formatTime(item.registeredAt)} 대기 등록</span>
-                <span>{item.waitMinutes}분 기다림</span>
+                <span className="waiting-meta">{formatTime(item.registeredAt)} 대기 등록</span>
+                <span className="waiting-meta">{item.waitMinutes}분 기다림</span>
                 {status === 'pending' && (
                   <div className="waiting-row-actions">
                     <div className="call-status">
                       {countdown ? (
-                        <span className="call-timer">입장 대기 시간 {countdown}</span>
+                        <span className="call-timer">입장 대기 {countdown}</span>
                       ) : callMissed ? (
                         <span className="call-missed">미입장</span>
                       ) : null}
@@ -275,10 +283,10 @@ export default function WaitingManagePage() {
                   </div>
                 )}
                 {status === 'completed' && (
-                  <span>{formatTime(item.completedAt)} 대기 완료</span>
+                  <span className="waiting-end">{formatTime(item.completedAt)} 대기 완료</span>
                 )}
                 {status === 'cancelled' && (
-                  <span>
+                  <span className="waiting-end">
                     {formatTime(item.cancelledAt)} {item.endLabel || '대기 취소'}
                   </span>
                 )}
@@ -290,7 +298,7 @@ export default function WaitingManagePage() {
 
         {status === 'pending' && selected && (
           <button type="button" className="btn-primary enter-btn" onClick={complete}>
-            {selected.dailySeq}번 / 인원 {selected.totalCount}명 입장하기 &gt;
+            {selected.dailySeq}번 / 인원 {selected.totalCount}명 입장하기 →
           </button>
         )}
       </main>

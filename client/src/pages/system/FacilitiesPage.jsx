@@ -262,7 +262,7 @@ export default function FacilitiesPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -274,7 +274,12 @@ export default function FacilitiesPage() {
       />
       <main className="admin-main">
         <div className="page-title-row">
-          <h1>시설사 관리</h1>
+          <div className="admin-header-text">
+            <h1>시설사 관리</h1>
+            <p className="admin-page-desc">
+              등록된 시설사 계정과 접속 주소, 알림톡 단가를 관리합니다
+            </p>
+          </div>
           <button type="button" className="btn-primary" onClick={openCreate}>
             시설사 등록
           </button>

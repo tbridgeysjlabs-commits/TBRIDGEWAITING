@@ -3445,3 +3445,679 @@ th {
   font-weight: 600;
   font-size: 14px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   시설사 관리자 — standalone HTML 디자인 반영
+   (sidebarStyle=dark, accent #e0342a, logo: /tbridge_logo.png)
+   ═══════════════════════════════════════════════════════════ */
+.admin-layout.facility-admin {
+  --admin-bg: #f7f7f8;
+  --admin-panel: #ffffff;
+  --admin-panel-2: #fafafb;
+  --admin-border: #e9e9ec;
+  --admin-border-strong: #e3e3e7;
+  --admin-text: #17171a;
+  --admin-muted: #8a8a94;
+  --admin-accent: #e0342a;
+  --admin-accent-hover: #b8271f;
+  --admin-danger: #e0342a;
+  --admin-sidebar: #16161a;
+  --admin-sidebar-text: #f2564b;
+  --admin-sidebar-active: #ffffff;
+  --red: #e0342a;
+  --red-soft: #e0342a;
+  --purple: #e0342a;
+  --purple-dark: #b8271f;
+  --admin-blue: #e0342a;
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+.admin-layout.facility-admin .admin-main {
+  padding: 30px 36px 60px;
+  gap: 16px;
+  max-width: none;
+}
+
+.admin-layout.facility-admin .admin-header {
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.admin-layout.facility-admin .admin-header-text h1,
+.admin-layout.facility-admin .admin-main > h1,
+.admin-layout.facility-admin .page-title-row h1,
+.admin-layout.facility-admin .settings-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #17171a;
+}
+
+.admin-layout.facility-admin .admin-page-desc,
+.admin-layout.facility-admin .settings-page-header p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: #8a8a94;
+  font-weight: 500;
+}
+
+.admin-layout.facility-admin .admin-clock {
+  padding: 9px 14px;
+  border: 1px solid #e9e9ec;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3c3c44;
+}
+
+/* Sidebar — dark, active = white pill + red inset */
+.admin-layout.facility-admin .facility-admin-sidebar {
+  background: #16161a;
+  border-right: 1px solid #16161a;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar .sidebar-top {
+  padding: 26px 20px 22px;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar .sidebar-logo img {
+  height: 22px;
+  max-width: 140px;
+  object-fit: contain;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar nav {
+  padding: 0 12px;
+  gap: 2px;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar a {
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f2564b;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar a:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ff7a70;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar a.active {
+  background: #ffffff;
+  color: #17171a;
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 #e0342a;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar .admin-sidebar-foot {
+  padding: 20px 16px;
+  border-top: none;
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar .logout-btn {
+  width: 100%;
+  padding: 11px 0;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.admin-layout.facility-admin .facility-admin-sidebar .logout-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.admin-layout.facility-admin .sidebar-toggle {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.admin-layout.facility-admin .sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Cards / filters / tables */
+.admin-layout.facility-admin .filter-box,
+.admin-layout.facility-admin .table-wrap,
+.admin-layout.facility-admin .settings-card,
+.admin-layout.facility-admin .settings-section,
+.admin-layout.facility-admin .billing-balance-bar,
+.admin-layout.facility-admin .waiting-list-box {
+  background: #fff;
+  border: 1px solid #e9e9ec;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.admin-layout.facility-admin .chip.active,
+.admin-layout.facility-admin .status-tab.active,
+.admin-layout.facility-admin .btn-dark {
+  background: #17171a;
+  border-color: #17171a;
+  color: #fff;
+}
+
+.admin-layout.facility-admin .status-tab {
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 14px;
+  border: 1px solid #e6e6ea;
+  color: #5d5d66;
+  background: #fff;
+  font-weight: 500;
+}
+
+.admin-layout.facility-admin .status-tab.active {
+  font-weight: 700;
+}
+
+.admin-layout.facility-admin .chip {
+  border-radius: 7px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  border: 1px solid #e6e6ea;
+  color: #6f6f79;
+}
+
+.admin-layout.facility-admin .filter-row > label > input[type='checkbox'] {
+  accent-color: #e0342a;
+}
+
+.admin-layout.facility-admin .btn-primary,
+.admin-layout.facility-admin .enter-btn {
+  background: #17171a;
+  border-color: #17171a;
+  border-radius: 12px;
+}
+
+.admin-layout.facility-admin .enter-btn {
+  width: 100%;
+  padding: 20px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  min-height: auto;
+}
+
+.admin-layout.facility-admin .enter-btn:hover:not(:disabled) {
+  background: #000;
+}
+
+/* Waiting list rows */
+.admin-layout.facility-admin .waiting-list-box {
+  overflow-x: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.admin-layout.facility-admin .waiting-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 17px 20px;
+  min-width: 760px;
+  border-bottom: 1px solid #f2f2f5;
+  border-top: none;
+  background: #fff;
+  grid-template-columns: none;
+}
+
+.admin-layout.facility-admin .waiting-row:nth-child(even) {
+  background: #fff;
+}
+
+.admin-layout.facility-admin .waiting-row.selected {
+  background: #fafafb;
+  box-shadow: inset 3px 0 0 #e0342a;
+}
+
+.admin-layout.facility-admin .waiting-row.calling,
+.admin-layout.facility-admin .waiting-row.calling.selected {
+  background: #fdf5f4;
+  box-shadow: inset 3px 0 0 #e0342a;
+}
+
+.admin-layout.facility-admin .waiting-row.done {
+  background: #fafafb;
+  box-shadow: inset 3px 0 0 #e0342a;
+}
+
+.admin-layout.facility-admin .order-circle {
+  width: 22px;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: #a5a5ae;
+  font-size: 13px;
+  font-weight: 600;
+  place-items: start;
+  display: block;
+}
+
+.admin-layout.facility-admin .seq-badge {
+  min-width: 62px;
+  text-align: center;
+  padding: 6px 0;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3c3c44;
+  background: #f2f2f5;
+}
+
+.admin-layout.facility-admin .seq-badge.accent {
+  color: #c62c23;
+  background: #fdeceb;
+}
+
+.admin-layout.facility-admin .waiting-row.calling .seq-badge.accent {
+  background: transparent;
+  color: #c62c23;
+}
+
+.admin-layout.facility-admin .party-text {
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 96px;
+  color: #17171a;
+}
+
+.admin-layout.facility-admin .waiting-meta {
+  font-size: 13px;
+  color: #6f6f79;
+  white-space: nowrap;
+}
+
+.admin-layout.facility-admin .waiting-row-actions {
+  margin-left: auto;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.admin-layout.facility-admin .call-timer {
+  color: #c62c23;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-layout.facility-admin .waiting-end {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3c3c44;
+  white-space: nowrap;
+}
+
+.admin-layout.facility-admin .waiting-row.calling .waiting-end,
+.admin-layout.facility-admin .waiting-row.done .waiting-end {
+  color: #c62c23;
+}
+
+.admin-layout.facility-admin .mini-call {
+  padding: 9px 20px;
+  border: 1px solid #e0342a;
+  border-radius: 8px;
+  background: #fff;
+  color: #e0342a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-layout.facility-admin .mini-call:hover {
+  background: #fdeceb;
+}
+
+.admin-layout.facility-admin .mini-cancel {
+  padding: 9px 16px;
+  border: 1px solid #e6e6ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #8a8a94;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-layout.facility-admin .mini-cancel:hover {
+  color: #3c3c44;
+  border-color: #d2d2d8;
+}
+
+/* Alimtalk segmented control */
+.admin-layout.facility-admin .alim-tab-switch,
+.admin-layout.facility-admin .tab-switch {
+  display: flex;
+  background: #efeff2;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 0;
+}
+
+.admin-layout.facility-admin .alim-tab-switch .chip,
+.admin-layout.facility-admin .tab-switch .chip {
+  border: none;
+  background: transparent;
+  color: #8a8a94;
+  padding: 7px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.admin-layout.facility-admin .alim-tab-switch .chip.active,
+.admin-layout.facility-admin .tab-switch .chip.active {
+  background: #fff;
+  color: #17171a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.admin-layout.facility-admin a {
+  color: #e0342a;
+}
+
+.admin-layout.facility-admin a:hover {
+  color: #b8271f;
+}
+
+.admin-layout.facility-admin .facility-status-badge.is-active,
+.admin-layout.facility-admin .kakao-resend-badge.is-success {
+  background: #eaf5ec;
+  color: #2b7a3f;
+}
+
+.admin-layout.facility-admin input::placeholder,
+.admin-layout.facility-admin textarea::placeholder {
+  color: #b4b4bd;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   시스템 관리자 — standalone HTML 디자인 반영
+   (dark sidebar + SYSTEM badge, logo: /tbridge_logo.png)
+   ═══════════════════════════════════════════════════════════ */
+.admin-layout.system-admin {
+  --admin-bg: #f7f7f8;
+  --admin-panel: #ffffff;
+  --admin-panel-2: #fafafb;
+  --admin-border: #e9e9ec;
+  --admin-border-strong: #e3e3e7;
+  --admin-text: #17171a;
+  --admin-muted: #8a8a94;
+  --admin-accent: #e0342a;
+  --admin-accent-hover: #b8271f;
+  --admin-danger: #e0342a;
+  --admin-sidebar: #16161a;
+  --admin-sidebar-text: #f2564b;
+  --admin-sidebar-active: #ffffff;
+  --red: #e0342a;
+  --red-soft: #e0342a;
+  --purple: #e0342a;
+  --purple-dark: #b8271f;
+  --admin-blue: #e0342a;
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+.admin-layout.system-admin .admin-main {
+  padding: 30px 36px 60px;
+  gap: 16px;
+}
+
+.admin-layout.system-admin .admin-header-text h1,
+.admin-layout.system-admin .admin-main > h1,
+.admin-layout.system-admin .page-title-row h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #17171a;
+}
+
+.admin-layout.system-admin .admin-page-desc {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: #8a8a94;
+  font-weight: 500;
+}
+
+.admin-layout.system-admin .page-title-row {
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.admin-layout.system-admin .page-title-row .btn-primary {
+  padding: 11px 22px;
+  border-radius: 9px;
+  background: #17171a;
+  border-color: #17171a;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: auto;
+  white-space: nowrap;
+}
+
+.admin-layout.system-admin .page-title-row .btn-primary:hover:not(:disabled) {
+  background: #000;
+  border-color: #000;
+}
+
+/* Sidebar */
+.admin-layout.system-admin .system-admin-sidebar {
+  background: #16161a;
+  border-right: 1px solid #16161a;
+}
+
+.admin-layout.system-admin .system-admin-sidebar .sidebar-top {
+  padding: 26px 20px 22px;
+}
+
+.admin-layout.system-admin .system-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-layout.system-admin .system-admin-sidebar .sidebar-logo img {
+  height: 22px;
+  max-width: 120px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.admin-layout.system-admin .system-badge {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(224, 52, 42, 0.16);
+  color: #f2564b;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.admin-layout.system-admin .system-admin-sidebar.collapsed .system-sidebar-brand {
+  justify-content: center;
+  flex: 0;
+}
+
+.admin-layout.system-admin .system-admin-sidebar.collapsed .sidebar-logo img {
+  height: 18px;
+  max-width: 52px;
+}
+
+.admin-layout.system-admin .system-admin-sidebar nav {
+  padding: 0 12px;
+  gap: 2px;
+}
+
+.admin-layout.system-admin .system-admin-sidebar a {
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f2564b;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-layout.system-admin .system-admin-sidebar a:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ff7a70;
+}
+
+.admin-layout.system-admin .system-admin-sidebar a.active {
+  background: #ffffff;
+  color: #17171a;
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 #e0342a;
+}
+
+.admin-layout.system-admin .system-admin-sidebar .admin-sidebar-foot {
+  padding: 20px 16px;
+  border-top: none;
+}
+
+.admin-layout.system-admin .system-admin-sidebar .logout-btn {
+  width: 100%;
+  padding: 11px 0;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.admin-layout.system-admin .system-admin-sidebar .logout-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.admin-layout.system-admin .sidebar-toggle {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.admin-layout.system-admin .sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Surfaces */
+.admin-layout.system-admin .filter-box,
+.admin-layout.system-admin .table-wrap,
+.admin-layout.system-admin .settings-section,
+.admin-layout.system-admin .settings-card,
+.admin-layout.system-admin .modal-card,
+.admin-layout.system-admin .billing-balance-bar {
+  background: #fff;
+  border: 1px solid #e9e9ec;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.admin-layout.system-admin .chip {
+  border-radius: 7px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  border: 1px solid #e6e6ea;
+  color: #6f6f79;
+  background: #fff;
+}
+
+.admin-layout.system-admin .chip.active,
+.admin-layout.system-admin .btn-dark {
+  background: #17171a;
+  border-color: #17171a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.admin-layout.system-admin .filter-row > label > input[type='checkbox'] {
+  accent-color: #e0342a;
+}
+
+.admin-layout.system-admin .btn-primary {
+  background: #17171a;
+  border-color: #17171a;
+}
+
+.admin-layout.system-admin .btn-primary:hover:not(:disabled) {
+  background: #000;
+  border-color: #000;
+}
+
+.admin-layout.system-admin .facility-code-btn {
+  color: #e0342a;
+  font-weight: 700;
+}
+
+.admin-layout.system-admin .facility-code-btn:hover {
+  color: #b8271f;
+}
+
+.admin-layout.system-admin a,
+.admin-layout.system-admin .linkish {
+  color: #e0342a;
+}
+
+.admin-layout.system-admin a:hover,
+.admin-layout.system-admin .linkish:hover {
+  color: #b8271f;
+}
+
+/* Alimtalk segmented tabs */
+.admin-layout.system-admin .alim-tab-switch,
+.admin-layout.system-admin .tab-switch {
+  display: flex;
+  background: #efeff2;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 0;
+}
+
+.admin-layout.system-admin .alim-tab-switch .chip,
+.admin-layout.system-admin .tab-switch .chip {
+  border: none;
+  background: transparent;
+  color: #8a8a94;
+  padding: 7px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.admin-layout.system-admin .alim-tab-switch .chip.active,
+.admin-layout.system-admin .tab-switch .chip.active {
+  background: #fff;
+  color: #17171a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.admin-layout.system-admin .facility-status-badge.is-active {
+  background: #eaf5ec;
+  color: #2b7a3f;
+}
+
+.admin-layout.system-admin input::placeholder,
+.admin-layout.system-admin textarea::placeholder {
+  color: #b4b4bd;
+}
+
+.admin-layout.system-admin table th {
+  background: #fafafb;
+  color: #8a8a94;
+}

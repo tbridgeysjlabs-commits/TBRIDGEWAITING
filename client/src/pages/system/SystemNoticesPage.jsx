@@ -80,7 +80,7 @@ export default function SystemNoticesPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -92,7 +92,12 @@ export default function SystemNoticesPage() {
       />
       <main className="admin-main">
         <div className="page-title-row">
-          <h1>공지사항 관리</h1>
+          <div className="admin-header-text">
+            <h1>공지사항 관리</h1>
+            <p className="admin-page-desc">
+              전체 시설사에 노출되는 업데이트 공지를 관리합니다
+            </p>
+          </div>
           <button type="button" className="btn-primary" onClick={openCreate}>
             공지 등록
           </button>

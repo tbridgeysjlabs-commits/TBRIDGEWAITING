@@ -131,7 +131,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}
@@ -143,7 +143,10 @@ export default function CustomersPage() {
         }}
       />
       <main className="admin-main">
-        <h1>고객 관리</h1>
+        <header className="admin-header-text">
+          <h1>고객 관리</h1>
+          <p className="admin-page-desc">등록된 고객과 마케팅 동의 상태를 관리합니다</p>
+        </header>
 
         <section className="filter-box">
           <div className="filter-row">

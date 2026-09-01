@@ -176,7 +176,7 @@ export default function BillingPage() {
   );
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}
@@ -189,8 +189,11 @@ export default function BillingPage() {
       />
       <main className="admin-main">
         <div className="page-title-row">
-          <h1>알림톡</h1>
-          <div className="tab-switch">
+          <div className="admin-header-text">
+            <h1>알림톡</h1>
+            <p className="admin-page-desc">발송 내역과 충전금을 관리합니다</p>
+          </div>
+          <div className="tab-switch alim-tab-switch">
             <button
               type="button"
               className={`chip ${tab === 'summary' ? 'active' : ''}`}

@@ -436,7 +436,7 @@ export default function SettingsPage() {
   if (!form) return <div className="center-page">Loading...</div>;
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}

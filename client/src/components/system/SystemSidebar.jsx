@@ -9,10 +9,11 @@ const NAV = [
   { to: '/system-admin/settings', label: '설정', short: '설정' },
 ];
 
-function SidebarBrand() {
+function SidebarBrand({ collapsed }) {
   return (
-    <div className="sidebar-logo" aria-label="T BRIDGE">
+    <div className="sidebar-logo system-sidebar-brand" aria-label="T BRIDGE SYSTEM">
       <img src="/tbridge_logo.png" alt="T BRIDGE" />
+      {!collapsed && <span className="system-badge">SYSTEM</span>}
     </div>
   );
 }
@@ -34,9 +35,9 @@ function SidebarToggle({ onClick, title, expand }) {
 
 export default function SystemSidebar({ onLogout, collapsed, onToggle }) {
   return (
-    <aside className={`admin-sidebar${collapsed ? ' collapsed' : ''}`}>
+    <aside className={`admin-sidebar system-admin-sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-top">
-        <SidebarBrand />
+        <SidebarBrand collapsed={collapsed} />
         <SidebarToggle
           onClick={onToggle}
           title={collapsed ? '메뉴 열기' : '메뉴 닫기'}

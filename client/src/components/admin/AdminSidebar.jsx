@@ -36,7 +36,7 @@ export default function AdminSidebar({ facilityCode, onLogout, collapsed, onTogg
   const base = `/admin/${facilityCode}`;
 
   return (
-    <aside className={`admin-sidebar${collapsed ? ' collapsed' : ''}`}>
+    <aside className={`admin-sidebar facility-admin-sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-top">
         <SidebarBrand />
         <SidebarToggle

@@ -171,7 +171,7 @@ export default function SystemBillingPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -183,8 +183,11 @@ export default function SystemBillingPage() {
       />
       <main className="admin-main">
         <div className="page-title-row">
-          <h1>알림톡</h1>
-          <div className="tab-switch">
+          <div className="admin-header-text">
+            <h1>알림톡</h1>
+            <p className="admin-page-desc">시설사별 발송 집계와 충전·취소를 관리합니다</p>
+          </div>
+          <div className="tab-switch alim-tab-switch">
             <button
               type="button"
               className={`chip ${tab === 'summary' ? 'active' : ''}`}

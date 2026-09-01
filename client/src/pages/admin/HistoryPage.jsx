@@ -149,7 +149,7 @@ export default function HistoryPage() {
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}
@@ -161,7 +161,10 @@ export default function HistoryPage() {
         }}
       />
       <main className="admin-main">
-        <h1>대기자 내역</h1>
+        <header className="admin-header-text">
+          <h1>대기자 내역</h1>
+          <p className="admin-page-desc">기간·상태별 대기 기록을 조회합니다</p>
+        </header>
         <section className="filter-box">
           <div className="filter-row">
             <span className="filter-label">검색 기간</span>

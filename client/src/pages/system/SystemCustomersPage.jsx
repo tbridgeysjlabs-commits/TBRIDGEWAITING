@@ -133,7 +133,7 @@ export default function SystemCustomersPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -144,7 +144,12 @@ export default function SystemCustomersPage() {
         }}
       />
       <main className="admin-main">
-        <h1>고객 관리 (전체 시설사)</h1>
+        <header className="admin-header-text">
+          <h1>고객 관리 (전체 시설사)</h1>
+          <p className="admin-page-desc">
+            전체 시설사에 등록된 고객과 마케팅 동의 상태입니다
+          </p>
+        </header>
 
         <section className="filter-box">
           <div className="filter-row">

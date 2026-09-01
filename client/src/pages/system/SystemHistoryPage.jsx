@@ -112,7 +112,7 @@ export default function SystemHistoryPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -123,7 +123,10 @@ export default function SystemHistoryPage() {
         }}
       />
       <main className="admin-main">
-        <h1>대기자 내역 (전체 시설사)</h1>
+        <header className="admin-header-text">
+          <h1>대기자 내역 (전체 시설사)</h1>
+          <p className="admin-page-desc">모든 시설사의 대기 기록을 조회합니다</p>
+        </header>
         <section className="filter-box">
           <div className="filter-row">
             <span className="filter-label">검색 기간</span>

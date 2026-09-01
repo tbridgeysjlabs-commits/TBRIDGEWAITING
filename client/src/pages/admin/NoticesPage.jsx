@@ -27,7 +27,7 @@ export default function NoticesPage() {
   }
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout facility-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <AdminSidebar
         facilityCode={facilityCode}
@@ -39,7 +39,10 @@ export default function NoticesPage() {
         }}
       />
       <main className="admin-main">
-        <h1>공지사항</h1>
+        <header className="admin-header-text">
+          <h1>공지사항</h1>
+          <p className="admin-page-desc">서비스 업데이트 및 안내사항입니다</p>
+        </header>
         <div className="table-wrap">
           <table>
             <thead>

@@ -79,7 +79,7 @@ export default function SystemSettingsPage() {
   };
 
   return (
-    <div className={`admin-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-layout system-admin ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast message={toast} visible={!!toast} />
       <SystemSidebar
         collapsed={collapsed}
@@ -90,7 +90,10 @@ export default function SystemSettingsPage() {
         }}
       />
       <main className="admin-main settings-main">
-        <h1>설정</h1>
+        <header className="admin-header-text">
+          <h1>설정</h1>
+          <p className="admin-page-desc">시스템 관리자 계정 정보를 관리합니다</p>
+        </header>
         <form className="settings-section" onSubmit={save}>
           <label>
             관리자 연락처
