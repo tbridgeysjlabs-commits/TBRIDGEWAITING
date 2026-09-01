@@ -531,8 +531,10 @@ export const kakaoService = {
   },
 
   /**
-   * usage_history 원본 페이로드(동일 템플릿/변수)로 재발송.
-   * isResend=Y 로 Ppurio 호출. 성공/실패를 last_resend_* 에 기록하고 과금 이력도 추가.
+   * usage_history 원본 페이로드(동일 템플릿/변수)로 알림톡을 다시 발송한다.
+   *
+   * 주의: 뿌리오 `isResend=Y` 는 SMS 대체발송 옵션이며, 이 경우 `resend` 객체가 필수다.
+   * UI [재발송]은 동일 알림톡을 다시 보내는 것이므로 isResend=N 으로 일반 발송한다.
    */
   async resendFromUsage(usageId, { facilityCode } = {}) {
     const usage = await billingRepository.findUsageById(usageId);
@@ -627,7 +629,8 @@ export const kakaoService = {
       changeWord,
       refKey,
       live: useLive,
-      isResend: true,
+      // 동일 알림톡 재전송(일반 발송). 뿌리오 isResend=Y 는 SMS 대체발송용.
+      isResend: false,
     };
 
     let sendResult = { ok: true, mock: !useLive };
@@ -638,7 +641,7 @@ export const kakaoService = {
           templateCode,
           changeWord,
           refKey,
-          isResend: 'Y',
+          isResend: 'N',
         });
         resendPayload.ppurio = {
           ok: sendResult.ok,

@@ -198,7 +198,12 @@ export async function sendAlimtalk({
     isResend: isResend === 'Y' ? 'Y' : 'N',
   };
 
-  if (body.isResend === 'Y' && resend) {
+  if (body.isResend === 'Y') {
+    if (!resend || typeof resend !== 'object') {
+      throw new Error(
+        '[ppurio] isResend=Y 일 때 resend(대체발송) 객체가 필요합니다.'
+      );
+    }
     body.resend = resend;
   }
 
