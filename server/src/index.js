@@ -8,6 +8,7 @@ import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { initSocketServer } from './realtime/socketHub.js';
 import { setUploadContentType, resolvePublicUploadUrl } from './utils/imageUpload.js';
+import { nicepayService } from './services/nicepayService.js';
 
 dotenv.config();
 
@@ -70,7 +71,18 @@ app.use(
 );
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, version: process.env.SYSTEM_VERSION || 'v260901_01' });
+  const pg = nicepayService.getPublicConfig();
+  res.json({
+    ok: true,
+    version: process.env.SYSTEM_VERSION || 'v260901_01',
+    nicepay: {
+      mode: pg.mode,
+      configured: pg.configured,
+      allowMock: pg.allowMock,
+      apiPublicUrl: pg.apiPublicUrl,
+      clientOrigin: pg.clientOrigin,
+    },
+  });
 });
 
 app.use('/api', routes);
@@ -82,4 +94,13 @@ initSocketServer(server, { allowedOrigins });
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`T-Bridge Waiting API listening on http://localhost:${PORT}`);
+  const pg = nicepayService.getPublicConfig();
+  console.log(
+    `[NicePay] mode=${pg.mode} configured=${pg.configured} allowMock=${pg.allowMock} return=${pg.apiPublicUrl}/api/billing/nicepay/return`
+  );
+  if (!pg.configured && !pg.allowMock) {
+    console.warn(
+      '[NicePay] NICEPAY_MID / NICEPAY_MERCHANT_KEY 미설정 — 시설사 충전(PG) 불가'
+    );
+  }
 });

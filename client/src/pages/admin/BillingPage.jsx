@@ -138,35 +138,15 @@ export default function BillingPage() {
         method: 'POST',
         body: JSON.stringify({ amount: value }),
       });
+      if (!prepared?.pay?.mid || !prepared?.pay?.signData) {
+        throw new Error('결제 준비에 실패했습니다. 나이스페이 설정을 확인해 주세요.');
+      }
       setOpen(false);
-      setToast('결제창을 호출합니다...');
+      setToast('나이스페이 결제창을 호출합니다...');
       await launchNicepay(prepared.pay);
     } catch (err) {
-      // prepare 실패 시(키 미설정 등) MOCK 직접충전 폴백 시도
-      if (/나이스페이 설정/.test(err.message || '')) {
-        try {
-          const result = await api(`/admin/${facilityCode}/billing/charge`, {
-            method: 'POST',
-            body: JSON.stringify({
-              amount: value,
-              paymentMethod: '카드(MOCK)',
-            }),
-          });
-          setBilling(result);
-          setOpen(false);
-          setAmount('');
-          setToast('충전이 완료되었습니다. (MOCK)');
-          setTimeout(() => setToast(''), 2500);
-          if (tab === 'charges') await loadCharges();
-          else await loadBilling();
-          return;
-        } catch (mockErr) {
-          setToast(mockErr.message);
-          return;
-        }
-      }
-      setToast(err.message);
-      setTimeout(() => setToast(''), 3000);
+      setToast(err.message || '결제 준비에 실패했습니다.');
+      setTimeout(() => setToast(''), 4000);
     }
   };
 
@@ -216,6 +196,16 @@ export default function BillingPage() {
             </button>
           </div>
         </div>
+
+        {billing?.paymentPgMode === 'mock' && (
+          <div className="admin-alert admin-alert-warn" role="status">
+            결제(PG): 테스트(MOCK) 모드 — 나이스페이 실결제가 비활성입니다
+            <span className="admin-alert-sub">
+              서버에 NICEPAY_MID / NICEPAY_MERCHANT_KEY 를 설정하고 NICEPAY_ALLOW_MOCK=0 이면
+              실결제로 전환됩니다.
+            </span>
+          </div>
+        )}
 
         {billing?.kakaoAlimtalkMode === 'mock' && (
           <div className="admin-alert admin-alert-warn" role="status">

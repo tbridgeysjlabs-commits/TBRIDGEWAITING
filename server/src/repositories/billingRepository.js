@@ -46,7 +46,7 @@ export const billingRepository = {
     amount,
     {
       note = '알림톡 충전',
-      paymentMethod = '카드(MOCK)',
+      paymentMethod = '카드',
       receiptUrl,
       pgTid,
       pgMoid,

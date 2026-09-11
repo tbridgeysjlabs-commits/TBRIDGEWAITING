@@ -512,13 +512,21 @@ export const facilityService = {
         Number(facility.kakao_balance || 0) < Number(facility.kakao_unit_cost || 20),
       kakaoAlimtalkMode: isPpurioConfigured() ? 'live' : 'mock',
       kakaoAlimtalkLive: isPpurioConfigured(),
+      paymentPgMode: nicepayService.getPublicConfig().mode,
+      nicepayConfigured: nicepayService.isConfigured(),
+      nicepayAllowMock: nicepayService.isMockAllowed(),
     };
   },
 
   async charge(facilityCode, amount, options = {}) {
-    // 직접 충전은 MOCK 허용 시에만 (나이스페이 우회 방지)
-    if (nicepayService.isConfigured() && process.env.NICEPAY_ALLOW_MOCK !== '1') {
-      throw createError(400, '나이스페이 결제를 이용해 충전해 주세요.');
+    // 운영: MOCK 직접충전 금지 — NicePay prepare/return 경로만 허용
+    if (!nicepayService.isMockAllowed()) {
+      throw createError(
+        400,
+        nicepayService.isConfigured()
+          ? '나이스페이 결제를 이용해 충전해 주세요.'
+          : '나이스페이 설정(NICEPAY_MID/NICEPAY_MERCHANT_KEY)이 필요합니다.'
+      );
     }
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');

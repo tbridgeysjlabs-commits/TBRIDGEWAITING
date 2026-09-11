@@ -43,7 +43,9 @@ export async function launchNicepay(pay) {
   const form = document.createElement('form');
   form.name = 'nicepay_pay_form';
   form.method = 'POST';
-  form.acceptCharset = 'euc-kr';
+  // CharSet과 동일해야 한글 GoodsName/BuyerName이 깨지지 않음
+  const charSet = pay.charSet || 'utf-8';
+  form.acceptCharset = charSet;
   form.style.display = 'none';
 
   const fields = {
@@ -60,7 +62,7 @@ export async function launchNicepay(pay) {
     BuyerEmail: pay.buyerEmail || '',
     GoodsCl: pay.goodsCl || '1',
     TransType: pay.transType || '0',
-    CharSet: pay.charSet || 'utf-8',
+    CharSet: charSet,
     ReqReserved: pay.reqReserved || '',
   };
 

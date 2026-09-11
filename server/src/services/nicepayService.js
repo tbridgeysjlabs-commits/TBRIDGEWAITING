@@ -10,32 +10,53 @@ function ediDateNow() {
   return formatEdiDateKst(new Date());
 }
 
+/** env 값 공백·따옴표 제거 (Render/쉘에서 따옴표 포함 저장되는 경우 대비) */
+function envStr(name, fallback = '') {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  return String(raw)
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .trim();
+}
+
+function isMockAllowed() {
+  return envStr('NICEPAY_ALLOW_MOCK', '0') === '1';
+}
+
 function getConfig() {
-  const mid = process.env.NICEPAY_MID || '';
-  const merchantKey = process.env.NICEPAY_MERCHANT_KEY || '';
-  const cancelPwd = process.env.NICEPAY_CANCEL_PWD || '';
-  const buyerEmail = process.env.NICEPAY_BUYER_EMAIL || 'test@abc.com';
+  const mid = envStr('NICEPAY_MID');
+  const merchantKey = envStr('NICEPAY_MERCHANT_KEY');
+  const cancelPwd = envStr('NICEPAY_CANCEL_PWD');
+  const buyerEmail = envStr('NICEPAY_BUYER_EMAIL', 'test@abc.com');
   const apiPublicUrl = (
-    process.env.API_PUBLIC_URL ||
+    envStr('API_PUBLIC_URL') ||
     `http://localhost:${process.env.PORT || 4000}`
   ).replace(/\/$/, '');
-  const clientOrigin = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').replace(
-    /\/$/,
-    ''
-  );
+  // CLIENT_ORIGINS 우선(첫 URL), 없으면 CLIENT_ORIGIN
+  const origins = [envStr('CLIENT_ORIGINS'), envStr('CLIENT_ORIGIN')]
+    .join(',')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const clientOrigin = origins[0] || 'http://localhost:5173';
   return { mid, merchantKey, cancelPwd, buyerEmail, apiPublicUrl, clientOrigin };
 }
 
 /** API/로그용 — 비밀키 제외 */
 function getPublicConfig() {
-  const { mid, buyerEmail, apiPublicUrl, clientOrigin } = getConfig();
+  const { mid, buyerEmail, apiPublicUrl, clientOrigin, cancelPwd } = getConfig();
+  const configured = isNicepayConfigured();
   return {
-    mid,
+    mid: mid ? `${mid.slice(0, 4)}****` : '',
     buyerEmail,
     apiPublicUrl,
     clientOrigin,
-    configured: Boolean(getConfig().mid && getConfig().merchantKey),
-    hasCancelPwd: Boolean(getConfig().cancelPwd),
+    configured,
+    hasCancelPwd: Boolean(cancelPwd),
+    allowMock: isMockAllowed(),
+    /** live = 실결제만, mock = NICEPAY_ALLOW_MOCK=1 또는 키 미설정 */
+    mode: configured && !isMockAllowed() ? 'live' : 'mock',
   };
 }
 
@@ -82,6 +103,7 @@ export const nicepayService = {
   // 비밀키 포함 설정은 서비스 내부에서만 사용
   getPublicConfig,
   isConfigured: isNicepayConfigured,
+  isMockAllowed,
   sha256Hex,
   ediDateNow,
 
@@ -127,7 +149,9 @@ export const nicepayService = {
     const amt = String(Math.trunc(Number(amount)));
     const ediDate = ediDateNow();
     const signData = this.buildAuthSign(ediDate, mid, amt, merchantKey);
-    const goodsName = `알림톡 충전(${facilityName || facilityCode})`.slice(0, 40);
+    const goodsName = `알림톡충전 ${facilityName || facilityCode}`
+      .replace(/["[\]]/g, '')
+      .slice(0, 40);
 
     return {
       mid,
