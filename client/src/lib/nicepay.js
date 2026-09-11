@@ -59,7 +59,7 @@ export async function launchNicepay(pay) {
     ReturnURL: pay.returnUrl,
     BuyerName: pay.buyerName || '',
     BuyerTel: pay.buyerTel || '',
-    BuyerEmail: pay.buyerEmail || '',
+    BuyerEmail: pay.buyerEmail != null ? String(pay.buyerEmail) : '',
     GoodsCl: pay.goodsCl || '1',
     TransType: pay.transType || '0',
     CharSet: charSet,

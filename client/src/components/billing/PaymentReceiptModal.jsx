@@ -26,7 +26,7 @@ export default function PaymentReceiptModal({ item, onClose }) {
     { label: '승인번호', value: item.authCode || '-' },
     { label: '주문번호', value: item.pgMoid || '-' },
     { label: '거래번호(TID)', value: item.pgTid || '-' },
-    { label: '결제확인 이메일', value: item.buyerEmail || 'test@abc.com' },
+    { label: '결제확인 이메일', value: item.buyerEmail || '-' },
     { label: '결과', value: item.resultMsg || (item.cancelledAt ? '취소됨' : '승인완료') },
   ];
 

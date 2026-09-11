@@ -786,10 +786,7 @@ export const facilityService = {
   mapUsageRow(row) {
     const raw = row.pg_raw_response || {};
     const pgTid = row.pg_tid || row.po_tid || raw.TID || null;
-    const buyerEmail =
-      raw.BuyerEmail ||
-      process.env.NICEPAY_BUYER_EMAIL ||
-      'test@abc.com';
+    const buyerEmail = raw.BuyerEmail || process.env.NICEPAY_BUYER_EMAIL || '';
     return {
       id: row.id,
       facilityId: row.facility_id,

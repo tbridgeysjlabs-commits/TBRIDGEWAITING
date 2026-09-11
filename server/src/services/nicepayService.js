@@ -28,7 +28,7 @@ function getConfig() {
   const mid = envStr('NICEPAY_MID');
   const merchantKey = envStr('NICEPAY_MERCHANT_KEY');
   const cancelPwd = envStr('NICEPAY_CANCEL_PWD');
-  const buyerEmail = envStr('NICEPAY_BUYER_EMAIL', 'test@abc.com');
+  const buyerEmail = envStr('NICEPAY_BUYER_EMAIL', '');
   const apiPublicUrl = (
     envStr('API_PUBLIC_URL') ||
     `http://localhost:${process.env.PORT || 4000}`
@@ -163,8 +163,8 @@ export const nicepayService = {
       payMethod: 'CARD',
       buyerName: (buyerName || facilityName || '시설사관리자').slice(0, 30),
       buyerTel: String(buyerTel || '01000000000').replace(/\D/g, '').slice(0, 20) || '01000000000',
-      // 결제확인증(IssueLoader) 이메일 인증용 — 고정 이메일 저장
-      buyerEmail: getConfig().buyerEmail,
+      // 결제창 이메일 입력란 — 기본 공백 (사용자가 직접 입력)
+      buyerEmail: '',
       charSet: 'utf-8',
       goodsCl: '1',
       transType: '0',
