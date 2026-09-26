@@ -671,7 +671,7 @@ export default function FacilitiesPage() {
                   className="btn-dark facility-kakao-settings-btn"
                   onClick={openKakaoSettings}
                 >
-                  [시설사 계정 카카오 알림톡 설정]
+                  시설사 계정 카카오 알림톡 설정
                 </button>
               )}
               <label>

@@ -214,9 +214,33 @@ export default function WaitingManagePage() {
 
         <div className="status-tabs">
           {[
-            { key: 'pending', label: '대기 중', count: board?.counts?.pending || 0 },
-            { key: 'completed', label: '대기 완료', count: board?.counts?.completed || 0 },
-            { key: 'cancelled', label: '대기 취소', count: board?.counts?.cancelled || 0 },
+            {
+              key: 'pending',
+              label: '대기 중',
+              teams: board?.counts?.pending || 0,
+              people: (board?.pending || []).reduce(
+                (sum, w) => sum + Number(w.totalCount || 0),
+                0
+              ),
+            },
+            {
+              key: 'completed',
+              label: '대기 완료',
+              teams: board?.counts?.completed || 0,
+              people: (board?.completed || []).reduce(
+                (sum, w) => sum + Number(w.totalCount || 0),
+                0
+              ),
+            },
+            {
+              key: 'cancelled',
+              label: '대기 취소',
+              teams: board?.counts?.cancelled || 0,
+              people: (board?.cancelled || []).reduce(
+                (sum, w) => sum + Number(w.totalCount || 0),
+                0
+              ),
+            },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -224,7 +248,7 @@ export default function WaitingManagePage() {
               className={`status-tab ${status === tab.key ? 'active' : ''}`}
               onClick={() => setSearchParams({ status: tab.key })}
             >
-              {tab.label} ({tab.count}팀)
+              {tab.label} ({tab.teams}팀 / {tab.people}명)
             </button>
           ))}
         </div>

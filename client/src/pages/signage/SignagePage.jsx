@@ -169,6 +169,10 @@ export default function SignagePage() {
     0,
     (facility.pendingCount ?? pending.length) - (activeCall ? 1 : 0)
   );
+  const waitingPeople = (activeCall
+    ? pending.filter((w) => w.id !== activeCall.id)
+    : pending
+  ).reduce((sum, w) => sum + Number(w.totalCount || 0), 0);
   const isCalling = Boolean(activeCall);
   const name = facility.name || '{ 시설사명 }';
   const logoUrl = mediaUrl(facility.profileImageUrl);
@@ -275,6 +279,9 @@ export default function SignagePage() {
               <div className={styles.railCount}>
                 <span className={styles.railCountNum}>{waitingCount}</span>
                 <span className={styles.railCountUnit}>팀</span>
+                <span className={styles.railCountSep}>/</span>
+                <span className={styles.railCountNum}>{waitingPeople}</span>
+                <span className={styles.railCountUnit}>명</span>
               </div>
             </div>
             <div className={styles.railList}>

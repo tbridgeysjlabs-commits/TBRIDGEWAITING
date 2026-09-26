@@ -414,6 +414,13 @@
   color: rgba(243, 240, 255, 0.7);
 }
 
+.railCountSep {
+  font-size: 36px;
+  font-weight: 700;
+  color: rgba(243, 240, 255, 0.45);
+  margin: 0 4px;
+}
+
 .railList {
   flex: 1;
   min-height: 0;
