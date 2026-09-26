@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS facilities (
   kakao_balance NUMERIC(12,2) NOT NULL DEFAULT 10000,
   kakao_unit_cost NUMERIC(12,2) NOT NULL DEFAULT 20,
   kakao_warning_threshold NUMERIC(12,2) NOT NULL DEFAULT 1000,
+  kakao_account_type VARCHAR(20) NOT NULL DEFAULT 'tbridge'
+    CHECK (kakao_account_type IN ('tbridge', 'facility')),
   failed_login_count INTEGER NOT NULL DEFAULT 0,
   locked_until TIMESTAMPTZ,
   status VARCHAR(20) NOT NULL DEFAULT 'active'
@@ -258,3 +260,22 @@ CREATE TABLE IF NOT EXISTS system_settings (
 INSERT INTO system_settings (key, value)
 VALUES ('admin_contact', '')
 ON CONFLICT (key) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS facility_kakao_alimtalk_settings (
+  facility_id UUID PRIMARY KEY REFERENCES facilities(id) ON DELETE CASCADE,
+  reseller_name TEXT NOT NULL DEFAULT '',
+  reseller_api_url TEXT NOT NULL DEFAULT '',
+  reseller_id TEXT NOT NULL DEFAULT '',
+  reseller_pw TEXT NOT NULL DEFAULT '',
+  reseller_api_key TEXT NOT NULL DEFAULT '',
+  sender_phone TEXT NOT NULL DEFAULT '',
+  sender_profile TEXT NOT NULL DEFAULT '',
+  template_waiting_registered TEXT NOT NULL DEFAULT '',
+  template_entry_imminent TEXT NOT NULL DEFAULT '',
+  template_entry_guide TEXT NOT NULL DEFAULT '',
+  template_no_show_cancelled TEXT NOT NULL DEFAULT '',
+  template_order_changed TEXT NOT NULL DEFAULT '',
+  template_waiting_cancelled TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

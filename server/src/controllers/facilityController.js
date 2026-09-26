@@ -109,6 +109,9 @@ export const facilityController = {
         masterUsername: req.body.masterUsername,
         masterPassword: req.body.masterPassword,
         kakaoUnitCost: req.body.kakaoUnitCost,
+        kakaoAccountType: req.body.kakaoAccountType,
+        kakaoAlimtalkSettings: req.body.kakaoAlimtalkSettings,
+        adAreaEnabled: req.body.adAreaEnabled,
         status: req.body.status,
       });
       res.status(201).json(facility);
@@ -121,6 +124,29 @@ export const facilityController = {
     try {
       res.json(
         await facilityService.updateFacilityBySystem(req.params.facilityCode, req.body)
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getKakaoAlimtalkSettings(req, res, next) {
+    try {
+      res.json(
+        await facilityService.getKakaoAlimtalkSettings(req.params.facilityCode)
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async saveKakaoAlimtalkSettings(req, res, next) {
+    try {
+      res.json(
+        await facilityService.saveKakaoAlimtalkSettings(
+          req.params.facilityCode,
+          req.body
+        )
       );
     } catch (err) {
       next(err);

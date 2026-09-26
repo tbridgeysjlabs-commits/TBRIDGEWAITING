@@ -7,10 +7,12 @@ import { isPpurioConfigured, sendAlimtalk } from './ppurioClient.js';
 import {
   TEMPLATE,
   buildChangeWord,
+  getFacilityTemplateCode,
   getTemplateCode,
   registrationTemplateKey,
   templateDisplayName,
 } from './ppurioTemplates.js';
+import { facilityKakaoSettingsRepository } from '../repositories/facilityKakaoSettingsRepository.js';
 
 /** @typedef {'MOCK'|'INSUFFICIENT_BALANCE'|'API_ERROR'|'EXCEPTION'|'SUCCESS'} KakaoSendReason */
 
@@ -77,6 +79,19 @@ export const kakaoService = {
 
   async dispatchTemplate({ facility, waiting, templateKey, extraCtx = {} }) {
     const templateName = templateDisplayName(templateKey);
+    const isFacilityAccount = facility.kakao_account_type === 'facility';
+
+    // 시설사 자체 계정: 티브리지 잔액/단가 미사용
+    if (isFacilityAccount) {
+      return this.dispatchFacilityAccountTemplate({
+        facility,
+        waiting,
+        templateKey,
+        templateName,
+        extraCtx,
+      });
+    }
+
     const templateCode = getTemplateCode(templateKey);
     const unitCost = Number(facility.kakao_unit_cost || 20);
     const balance = Number(facility.kakao_balance || 0);
@@ -129,6 +144,7 @@ export const kakaoService = {
       changeWord,
       refKey,
       live: useLive,
+      accountType: 'tbridge',
     };
 
     let sendResult = { ok: true, mock: !useLive };
@@ -254,19 +270,16 @@ export const kakaoService = {
       [facility.id, waiting.id, JSON.stringify(payload)]
     );
     await waitingRepository.setKakaoSentAt(waiting.id, sentAt);
-
     const after = await billingRepository.deductForSend(facility.id, waiting.id, unitCost, {
       templateName,
       recipientPhone: waiting.phone,
       sendStatus: 'success',
       sendPayload: payload,
     });
-
     const warningThreshold = Number(
       after?.kakao_warning_threshold ?? facility.kakao_warning_threshold ?? 1000
     );
     const newBalance = Number(after?.kakao_balance ?? balance - unitCost);
-
     return withReason({
       ok: true,
       reason: 'SUCCESS',
@@ -277,6 +290,94 @@ export const kakaoService = {
       unitCost,
       lowBalanceWarning: newBalance <= warningThreshold,
       messagekey: sendResult.messagekey,
+    });
+  },
+
+  /**
+   * 시설사 자체 중계사 계정 발송.
+   * TODO: 실제 딜러사 API 문서 확보 후 resellerApiUrl + 인증정보로 연동 구현.
+   * 현재는 설정/분기 골격만 — 티브리지 뿌리오·잔액 차감은 사용하지 않음.
+   */
+  async dispatchFacilityAccountTemplate({
+    facility,
+    waiting,
+    templateKey,
+    templateName,
+    extraCtx = {},
+  }) {
+    const settings = await facilityKakaoSettingsRepository.findByFacilityId(facility.id);
+    const templateCode = getFacilityTemplateCode(settings, templateKey);
+
+    if (!templateCode) {
+      return withReason({
+        ok: false,
+        reason: 'API_ERROR',
+        detail: `MISSING_FACILITY_TEMPLATE templateKey=${templateKey}`,
+        code: 'MISSING_FACILITY_TEMPLATE',
+        message: `시설사 계정 템플릿 코드가 없습니다: ${templateName}`,
+      });
+    }
+
+    const ctx = buildCtx(facility, waiting, extraCtx);
+    const changeWord = buildChangeWord(templateKey, ctx);
+    const refKey = `wf_${String(waiting.id || '').replace(/-/g, '').slice(0, 22)}`;
+    const payload = {
+      templateKey,
+      templateName,
+      templateCode,
+      to: waiting.phone,
+      changeWord,
+      refKey,
+      accountType: 'facility',
+      resellerName: settings?.resellerName || '',
+      resellerApiUrl: settings?.resellerApiUrl || '',
+      senderProfile: settings?.senderProfile || '',
+      // TODO: 딜러사 API 호출 구현 시 live=true + 실제 응답 기록
+      live: false,
+      todo: 'FACILITY_RESELLER_API_PENDING',
+    };
+
+    console.log(
+      '[Kakao Alimtalk FACILITY] 시설사 계정 발송 골격 — 실제 딜러사 API 미연동',
+      {
+        facilityCode: facility.facility_code,
+        templateKey,
+        templateCode,
+        reseller: settings?.resellerName,
+        apiUrl: settings?.resellerApiUrl,
+      }
+    );
+
+    // TODO: callFacilityResellerAlimtalk({ settings, to, templateCode, changeWord, refKey })
+    // 문서 확보 전까지 성공 로그+이력만 남기고 잔액 미차감
+    const sentAt = new Date();
+    payload.mockNote =
+      '시설사 계정 모드: 딜러사 API 연동 대기(설정값만 사용, 실제 미발송)';
+    await query(
+      `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+       VALUES ($1, $2, 'kakao', $3, 'sent')`,
+      [facility.id, waiting.id, JSON.stringify(payload)]
+    );
+    await waitingRepository.setKakaoSentAt(waiting.id, sentAt);
+    // 시설사 계정은 티브리지 잔액 차감 없음 — 이력만 0원 기록
+    await billingRepository.deductForSend(facility.id, waiting.id, 0, {
+      templateName: `${templateName} (시설사계정)`,
+      recipientPhone: waiting.phone,
+      sendStatus: 'success',
+      sendPayload: payload,
+      note: '시설사 자체 계정 발송(딜러사 API 연동 대기)',
+    }).catch(() => null);
+
+    return withReason({
+      ok: true,
+      reason: 'MOCK',
+      mock: true,
+      detail: 'FACILITY_RESELLER_API_PENDING',
+      message: '시설사 계정 설정으로 분기됨(딜러사 API 연동 대기)',
+      payload,
+      sentAt,
+      balance: Number(facility.kakao_balance || 0),
+      unitCost: 0,
     });
   },
 

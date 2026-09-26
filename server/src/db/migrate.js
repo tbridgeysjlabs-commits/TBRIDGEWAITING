@@ -454,6 +454,45 @@ async function migrate() {
     }
   }
 
+  // 시설사별 카카오 알림톡 계정 분리
+  await addColumn(
+    'facilities',
+    'kakao_account_type',
+    `VARCHAR(20) NOT NULL DEFAULT 'tbridge'`
+  );
+  await query(`
+    DO $$ BEGIN
+      ALTER TABLE facilities DROP CONSTRAINT IF EXISTS facilities_kakao_account_type_check;
+    EXCEPTION WHEN undefined_object THEN NULL;
+    END $$;
+  `);
+  await query(`
+    ALTER TABLE facilities
+    ADD CONSTRAINT facilities_kakao_account_type_check
+    CHECK (kakao_account_type IN ('tbridge', 'facility'))
+  `).catch(() => {});
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS facility_kakao_alimtalk_settings (
+      facility_id UUID PRIMARY KEY REFERENCES facilities(id) ON DELETE CASCADE,
+      reseller_name TEXT NOT NULL DEFAULT '',
+      reseller_api_url TEXT NOT NULL DEFAULT '',
+      reseller_id TEXT NOT NULL DEFAULT '',
+      reseller_pw TEXT NOT NULL DEFAULT '',
+      reseller_api_key TEXT NOT NULL DEFAULT '',
+      sender_phone TEXT NOT NULL DEFAULT '',
+      sender_profile TEXT NOT NULL DEFAULT '',
+      template_waiting_registered TEXT NOT NULL DEFAULT '',
+      template_entry_imminent TEXT NOT NULL DEFAULT '',
+      template_entry_guide TEXT NOT NULL DEFAULT '',
+      template_no_show_cancelled TEXT NOT NULL DEFAULT '',
+      template_order_changed TEXT NOT NULL DEFAULT '',
+      template_waiting_cancelled TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   console.log('Migration completed.');
   await pool.end();
 }

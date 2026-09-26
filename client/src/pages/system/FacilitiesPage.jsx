@@ -3,7 +3,6 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { api, formatDateTime } from '../../api/client';
 import AdminCloseIcon from '../../components/admin/AdminCloseIcon';
 import FacilitySearchInput from '../../components/admin/FacilitySearchInput';
-import PasswordChecklist from '../../components/PasswordChecklist';
 import SystemSidebar from '../../components/system/SystemSidebar';
 import Toast from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -45,12 +44,30 @@ async function copyToClipboard(text) {
 
 const DEFAULT_MASTER_PASSWORD = 'tbridge1234!';
 
+const emptyKakaoSettings = () => ({
+  resellerName: '',
+  resellerApiUrl: '',
+  resellerId: '',
+  resellerPw: '',
+  resellerApiKey: '',
+  senderPhone: '',
+  senderProfile: '',
+  templateWaitingRegistered: '',
+  templateEntryImminent: '',
+  templateEntryGuide: '',
+  templateNoShowCancelled: '',
+  templateOrderChanged: '',
+  templateWaitingCancelled: '',
+});
+
 const emptyForm = {
   name: '',
   facilityCode: '',
   masterPassword: DEFAULT_MASTER_PASSWORD,
   adAreaEnabled: true,
+  kakaoAccountType: 'tbridge',
   kakaoUnitCost: '20',
+  kakaoAlimtalkSettings: emptyKakaoSettings(),
   status: 'active',
 };
 
@@ -60,10 +77,76 @@ function snapshotOf(form) {
     facilityCode: form.facilityCode,
     masterPassword: form.masterPassword,
     adAreaEnabled: form.adAreaEnabled !== false,
+    kakaoAccountType: form.kakaoAccountType === 'facility' ? 'facility' : 'tbridge',
     kakaoUnitCost: String(form.kakaoUnitCost ?? ''),
+    kakaoAlimtalkSettings: form.kakaoAlimtalkSettings || emptyKakaoSettings(),
     status: form.status,
   });
 }
+
+const KAKAO_SETTINGS_FIELDS = [
+  {
+    key: 'resellerName',
+    label: '카카오 알림톡 중계사(딜러사)명',
+    placeholder: '카카오 알림톡 중계사(딜러사)명 입력',
+  },
+  {
+    key: 'resellerApiUrl',
+    label: '카카오 알림톡 중계사 API 링크',
+    placeholder: '카카오 알림톡 중계사 API 링크 입력',
+  },
+  {
+    key: 'resellerId',
+    label: '카카오 알림톡 중계사(딜러사) ID',
+    placeholder: '카카오 알림톡 중계사(딜러사) ID 입력',
+  },
+  {
+    key: 'resellerPw',
+    label: '카카오 알림톡 중계사(딜러사) PW',
+    placeholder: '카카오 알림톡 중계사(딜러사) PW 입력',
+  },
+  {
+    key: 'resellerApiKey',
+    label: '카카오 알림톡 중계사 API 인증키',
+    placeholder: '카카오 알림톡 중계사 API 인증키 입력',
+  },
+  { key: 'senderPhone', label: '발신번호', placeholder: '발신번호 입력' },
+  {
+    key: 'senderProfile',
+    label: '카카오 알림톡 발신 프로필',
+    placeholder: '카카오 알림톡 발신 프로필 입력',
+  },
+  {
+    key: 'templateWaitingRegistered',
+    label: '1. 웨이팅 등록 완료 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+  {
+    key: 'templateEntryImminent',
+    label: '2. 입장 임박 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+  {
+    key: 'templateEntryGuide',
+    label: '3. 입장 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+  {
+    key: 'templateNoShowCancelled',
+    label: '4. 미입장 웨이팅 취소 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+  {
+    key: 'templateOrderChanged',
+    label: '5. 웨이팅 순서 변경 완료 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+  {
+    key: 'templateWaitingCancelled',
+    label: '6. 웨이팅 취소 완료 안내 카카오 알림톡 템플릿 코드',
+    placeholder: '카카오 알림톡 템플릿 코드 입력',
+  },
+];
 
 export default function FacilitiesPage() {
   const { systemUser, logoutSystem } = useAuth();
@@ -74,6 +157,8 @@ export default function FacilitiesPage() {
   const [mode, setMode] = useState('create');
   const [form, setForm] = useState(emptyForm);
   const [initialSnapshot, setInitialSnapshot] = useState('');
+  const [kakaoSettingsOpen, setKakaoSettingsOpen] = useState(false);
+  const [kakaoSettingsDraft, setKakaoSettingsDraft] = useState(emptyKakaoSettings());
   const [toast, setToast] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [statusActive, setStatusActive] = useState(true);
@@ -135,6 +220,8 @@ export default function FacilitiesPage() {
     setMode('create');
     setForm(emptyForm);
     setInitialSnapshot('');
+    setKakaoSettingsOpen(false);
+    setKakaoSettingsDraft(emptyKakaoSettings());
   };
 
   const requestClose = () => {
@@ -150,6 +237,10 @@ export default function FacilitiesPage() {
     const onKeyDown = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
+      if (kakaoSettingsOpen) {
+        setKakaoSettingsOpen(false);
+        return;
+      }
       if (mode === 'edit' && dirty) {
         const ok = window.confirm('변경사항이 저장되지 않았습니다. 그래도 닫으시겠습니까?');
         if (!ok) return;
@@ -158,14 +249,14 @@ export default function FacilitiesPage() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, mode, dirty]);
-
-  if (!systemUser) return <Navigate to="/system-admin/login" replace />;
+  }, [open, mode, dirty, kakaoSettingsOpen]);
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
   };
+
+  if (!systemUser) return <Navigate to="/system-admin/login" replace />;
 
   const copyLink = async (pathOrUrl) => {
     try {
@@ -178,24 +269,63 @@ export default function FacilitiesPage() {
 
   const openCreate = () => {
     setMode('create');
-    setForm({ ...emptyForm, masterPassword: DEFAULT_MASTER_PASSWORD });
+    setForm({
+      ...emptyForm,
+      masterPassword: DEFAULT_MASTER_PASSWORD,
+      kakaoAlimtalkSettings: emptyKakaoSettings(),
+    });
     setInitialSnapshot('');
     setOpen(true);
   };
 
-  const openEdit = (facility) => {
+  const openEdit = async (facility) => {
+    let settings = emptyKakaoSettings();
+    if (facility.kakaoAccountType === 'facility') {
+      try {
+        settings = await api(
+          `/system-admin/facilities/${encodeURIComponent(facility.facilityCode)}/kakao-alimtalk-settings`,
+          {},
+          'system'
+        );
+      } catch {
+        settings = emptyKakaoSettings();
+      }
+    }
     const next = {
       name: facility.name || '',
       facilityCode: facility.facilityCode || '',
       masterPassword: facility.masterPassword || DEFAULT_MASTER_PASSWORD,
       adAreaEnabled: facility.adAreaEnabled !== false,
+      kakaoAccountType:
+        facility.kakaoAccountType === 'facility' ? 'facility' : 'tbridge',
       kakaoUnitCost: String(facility.kakaoUnitCost ?? 20),
-      status: facility.status === 'withdraw' || facility.status === 'inactive' ? 'withdraw' : 'active',
+      kakaoAlimtalkSettings: { ...emptyKakaoSettings(), ...settings },
+      status:
+        facility.status === 'withdraw' || facility.status === 'inactive'
+          ? 'withdraw'
+          : 'active',
     };
     setMode('edit');
     setForm(next);
     setInitialSnapshot(snapshotOf(next));
     setOpen(true);
+  };
+
+  const openKakaoSettings = () => {
+    setKakaoSettingsDraft({
+      ...emptyKakaoSettings(),
+      ...(form.kakaoAlimtalkSettings || {}),
+    });
+    setKakaoSettingsOpen(true);
+  };
+
+  const saveKakaoSettingsDraft = () => {
+    setForm((prev) => ({
+      ...prev,
+      kakaoAlimtalkSettings: { ...kakaoSettingsDraft },
+    }));
+    setKakaoSettingsOpen(false);
+    showToast('시설사 계정 설정이 임시 저장되었습니다. 등록/수정으로 반영하세요.');
   };
 
   const submit = async (e) => {
@@ -216,6 +346,30 @@ export default function FacilitiesPage() {
       return;
     }
 
+    const kakaoAccountType =
+      form.kakaoAccountType === 'facility' ? 'facility' : 'tbridge';
+    if (kakaoAccountType === 'tbridge') {
+      const unitCost = Number(form.kakaoUnitCost);
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        showToast('카카오 알림톡 발송 비용을 입력해 주세요.');
+        return;
+      }
+    }
+
+    const payload = {
+      name: form.name,
+      masterPassword: masterPwd || DEFAULT_MASTER_PASSWORD,
+      adAreaEnabled: form.adAreaEnabled !== false,
+      kakaoAccountType,
+      status: form.status,
+      ...(kakaoAccountType === 'tbridge'
+        ? { kakaoUnitCost: Number(form.kakaoUnitCost) }
+        : {
+            kakaoAlimtalkSettings:
+              form.kakaoAlimtalkSettings || emptyKakaoSettings(),
+          }),
+    };
+
     try {
       if (mode === 'create') {
         const created = await api(
@@ -223,12 +377,8 @@ export default function FacilitiesPage() {
           {
             method: 'POST',
             body: JSON.stringify({
-              name: form.name,
+              ...payload,
               facilityCode: form.facilityCode,
-              masterPassword: masterPwd || DEFAULT_MASTER_PASSWORD,
-              adAreaEnabled: form.adAreaEnabled !== false,
-              kakaoUnitCost: Number(form.kakaoUnitCost),
-              status: form.status,
             }),
           },
           'system'
@@ -243,13 +393,7 @@ export default function FacilitiesPage() {
         `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}`,
         {
           method: 'PUT',
-          body: JSON.stringify({
-            name: form.name,
-            masterPassword: masterPwd,
-            adAreaEnabled: form.adAreaEnabled !== false,
-            kakaoUnitCost: Number(form.kakaoUnitCost),
-            status: form.status,
-          }),
+          body: JSON.stringify(payload),
         },
         'system'
       );
@@ -395,7 +539,11 @@ export default function FacilitiesPage() {
                         {signagePath}
                       </button>
                     </td>
-                    <td>{Number(f.kakaoUnitCost || 0).toLocaleString()}원</td>
+                    <td>
+                      {f.kakaoAccountType === 'facility'
+                        ? '시설사 계정'
+                        : `${Number(f.kakaoUnitCost || 0).toLocaleString()}원`}
+                    </td>
                     <td>{formatDateTime(f.createdAt)}</td>
                     <td>
                       <span
@@ -451,10 +599,9 @@ export default function FacilitiesPage() {
                   required={mode === 'create'}
                   autoComplete="off"
                 />
-                <PasswordChecklist
-                  password={form.masterPassword}
-                  username={form.facilityCode}
-                />
+                <p className="facility-password-hint">
+                  비밀번호는 아이디와 다르게 영문 대소문자·숫자·특수문자를 조합하여 10자 이상으로 설정해야 합니다!
+                </p>
                 {mode === 'create' && (
                   <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>
                     시설사용 비밀번호 초기값: admin1234! (시설 설정에서 변경)
@@ -482,20 +629,51 @@ export default function FacilitiesPage() {
                   비활성화
                 </label>
               </div>
-              <label>
-                카카오 알림톡 발송 비용
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.kakaoUnitCost}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d]/g, '');
-                    setForm({ ...form, kakaoUnitCost: v });
-                  }}
-                  required
-                />
-              </label>
+              <div className="settings-radio-row" style={{ marginBottom: 12 }}>
+                <span className="settings-radio-label">카카오 알림톡 계정</span>
+                <label className="settings-radio">
+                  <input
+                    type="radio"
+                    name="kakaoAccountType"
+                    checked={form.kakaoAccountType !== 'facility'}
+                    onChange={() => setForm({ ...form, kakaoAccountType: 'tbridge' })}
+                  />
+                  티브리지 계정
+                </label>
+                <label className="settings-radio">
+                  <input
+                    type="radio"
+                    name="kakaoAccountType"
+                    checked={form.kakaoAccountType === 'facility'}
+                    onChange={() => setForm({ ...form, kakaoAccountType: 'facility' })}
+                  />
+                  시설사 계정
+                </label>
+              </div>
+              {form.kakaoAccountType !== 'facility' ? (
+                <label>
+                  카카오 알림톡 발송 비용
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.kakaoUnitCost}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^\d]/g, '');
+                      setForm({ ...form, kakaoUnitCost: v });
+                    }}
+                    required
+                  />
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-dark facility-kakao-settings-btn"
+                  onClick={openKakaoSettings}
+                >
+                  [시설사 계정 카카오 알림톡 설정]
+                </button>
+              )}
               <label>
                 상태
                 <select
@@ -531,6 +709,57 @@ export default function FacilitiesPage() {
                 )}
               </div>
             </form>
+          </div>
+        )}
+
+        {kakaoSettingsOpen && (
+          <div
+            className="modal-backdrop"
+            style={{ zIndex: 1100 }}
+            onClick={() => setKakaoSettingsOpen(false)}
+          >
+            <div
+              className="modal-card facility-kakao-settings-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="close-btn abs"
+                onClick={() => setKakaoSettingsOpen(false)}
+                aria-label="닫기"
+              >
+                <AdminCloseIcon />
+              </button>
+              <h2>시설사 계정 카카오 알림톡</h2>
+              {KAKAO_SETTINGS_FIELDS.map((field) => (
+                <label key={field.key}>
+                  {field.label}
+                  <input
+                    type="text"
+                    value={kakaoSettingsDraft[field.key] || ''}
+                    placeholder={field.placeholder}
+                    onChange={(e) =>
+                      setKakaoSettingsDraft({
+                        ...kakaoSettingsDraft,
+                        [field.key]: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              ))}
+              <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setKakaoSettingsOpen(false)}
+                >
+                  닫기
+                </button>
+                <button type="button" className="btn-primary" onClick={saveKakaoSettingsDraft}>
+                  저장
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

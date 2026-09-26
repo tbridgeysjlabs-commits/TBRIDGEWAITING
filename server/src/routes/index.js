@@ -216,6 +216,16 @@ router.put(
   facilityController.update
 );
 router.get(
+  '/system-admin/facilities/:facilityCode/kakao-alimtalk-settings',
+  requireAuth(['system_admin']),
+  facilityController.getKakaoAlimtalkSettings
+);
+router.put(
+  '/system-admin/facilities/:facilityCode/kakao-alimtalk-settings',
+  requireAuth(['system_admin']),
+  facilityController.saveKakaoAlimtalkSettings
+);
+router.get(
   '/system-admin/history',
   requireAuth(['system_admin']),
   waitingController.systemHistory

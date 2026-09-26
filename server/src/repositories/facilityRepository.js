@@ -90,14 +90,16 @@ export const facilityRepository = {
     masterPasswordHash,
     masterPassword,
     kakaoUnitCost = 20,
+    kakaoAccountType = 'tbridge',
     status = 'active',
   }) {
+    const accountType = kakaoAccountType === 'facility' ? 'facility' : 'tbridge';
     const { rows } = await query(
       `INSERT INTO facilities (
          facility_code, name, master_username,
          facility_password_hash, master_password_hash, master_password,
-         kakao_unit_cost, status, kakao_balance
-       ) VALUES ($1, $2, '', $3, $4, $5, $6, $7, 0)
+         kakao_unit_cost, kakao_account_type, status, kakao_balance
+       ) VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, 0)
        RETURNING *`,
       [
         facilityCode,
@@ -106,6 +108,7 @@ export const facilityRepository = {
         masterPasswordHash,
         masterPassword,
         kakaoUnitCost,
+        accountType,
         status,
       ]
     );
@@ -213,6 +216,12 @@ export const facilityRepository = {
   },
 
   async updateFacility(facilityId, data) {
+    const accountType =
+      data.kakaoAccountType === 'facility'
+        ? 'facility'
+        : data.kakaoAccountType === 'tbridge'
+          ? 'tbridge'
+          : null;
     const { rows } = await query(
       `UPDATE facilities SET
          name = COALESCE($2, name),
@@ -224,6 +233,7 @@ export const facilityRepository = {
          master_password_hash = COALESCE($8, master_password_hash),
          facility_password_hash = COALESCE($9, facility_password_hash),
          master_password = COALESCE($10, master_password),
+         kakao_account_type = COALESCE($11, kakao_account_type),
          updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
@@ -238,6 +248,7 @@ export const facilityRepository = {
         data.masterPasswordHash ?? null,
         data.facilityPasswordHash ?? null,
         data.masterPassword ?? null,
+        accountType,
       ]
     );
     return rows[0];

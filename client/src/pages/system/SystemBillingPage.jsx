@@ -87,7 +87,10 @@ export default function SystemBillingPage() {
   const openCharge = async () => {
     try {
       const list = await api('/system-admin/facilities', {}, 'system');
-      setFacilities(Array.isArray(list) ? list : []);
+      const chargeable = (Array.isArray(list) ? list : []).filter(
+        (f) => f.kakaoAccountType !== 'facility'
+      );
+      setFacilities(chargeable);
       setChargeFacilityCode('');
       setChargeAmount('');
       setChargeOpen(true);

@@ -187,3 +187,24 @@ export function templateDisplayName(templateKey) {
   };
   return names[key] || key;
 }
+
+/** 시설사 자체 계정 설정의 템플릿 코드 필드 매핑 (고객 안내 6종) */
+export function getFacilityTemplateCode(settings, templateKey) {
+  if (!settings) return '';
+  const key =
+    templateKey === 'LAST_ORDER' ||
+    templateKey === 'CHOSEN_ORDER' ||
+    templateKey === 'NO_POSTPONE'
+      ? TEMPLATE.REGISTERED
+      : templateKey;
+  const map = {
+    [TEMPLATE.REGISTERED]: settings.templateWaitingRegistered,
+    [TEMPLATE.APPROACHING]: settings.templateEntryImminent,
+    [TEMPLATE.CALL_ENTRY]: settings.templateEntryGuide,
+    [TEMPLATE.TIMEOUT_CANCEL]: settings.templateNoShowCancelled,
+    [TEMPLATE.POSTPONE_DONE]: settings.templateOrderChanged,
+    [TEMPLATE.CANCEL]: settings.templateWaitingCancelled,
+  };
+  return String(map[key] || '').trim();
+}
+

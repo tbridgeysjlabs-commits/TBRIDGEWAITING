@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { facilityRepository } from '../repositories/facilityRepository.js';
+import { facilityKakaoSettingsRepository } from '../repositories/facilityKakaoSettingsRepository.js';
 import { waitingTypeRepository } from '../repositories/waitingTypeRepository.js';
 import { waitingRepository } from '../repositories/waitingRepository.js';
 import { billingRepository } from '../repositories/billingRepository.js';
@@ -44,6 +45,43 @@ function requireStrongPassword(password, username) {
   if (!result.valid) {
     throw createError(400, result.reasons[0] || '비밀번호 규칙을 확인해 주세요.');
   }
+}
+
+function emptyKakaoSettings() {
+  return {
+    resellerName: '',
+    resellerApiUrl: '',
+    resellerId: '',
+    resellerPw: '',
+    resellerApiKey: '',
+    senderPhone: '',
+    senderProfile: '',
+    templateWaitingRegistered: '',
+    templateEntryImminent: '',
+    templateEntryGuide: '',
+    templateNoShowCancelled: '',
+    templateOrderChanged: '',
+    templateWaitingCancelled: '',
+  };
+}
+
+function normalizeKakaoSettingsInput(input = {}) {
+  const s = (v) => (v == null ? '' : String(v).trim());
+  return {
+    resellerName: s(input.resellerName),
+    resellerApiUrl: s(input.resellerApiUrl),
+    resellerId: s(input.resellerId),
+    resellerPw: s(input.resellerPw),
+    resellerApiKey: s(input.resellerApiKey),
+    senderPhone: s(input.senderPhone),
+    senderProfile: s(input.senderProfile),
+    templateWaitingRegistered: s(input.templateWaitingRegistered),
+    templateEntryImminent: s(input.templateEntryImminent),
+    templateEntryGuide: s(input.templateEntryGuide),
+    templateNoShowCancelled: s(input.templateNoShowCancelled),
+    templateOrderChanged: s(input.templateOrderChanged),
+    templateWaitingCancelled: s(input.templateWaitingCancelled),
+  };
 }
 
 function pickTerm(row, base, lang) {
@@ -129,6 +167,7 @@ function toPublicFacility(row, lang = 'ko') {
     kioskNoticeZh: row.kiosk_notice_zh || '',
     kakaoBalance: balance,
     kakaoUnitCost: Number(row.kakao_unit_cost || 20),
+    kakaoAccountType: row.kakao_account_type === 'facility' ? 'facility' : 'tbridge',
     kakaoWarningThreshold: warning,
     lowBalanceWarning: balance > 0 && balance <= warning,
     insufficientBalance: balance < Number(row.kakao_unit_cost || 20),
@@ -264,9 +303,15 @@ export const facilityService = {
     if (!input.facilityCode || !input.name) {
       throw createError(400, '필수 항목을 모두 입력해 주세요.');
     }
-    const unitCost = Number(input.kakaoUnitCost);
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      throw createError(400, '카카오 알림톡 발송 비용은 숫자로 입력해 주세요.');
+    const kakaoAccountType =
+      input.kakaoAccountType === 'facility' ? 'facility' : 'tbridge';
+    let unitCost = Number(input.kakaoUnitCost);
+    if (kakaoAccountType === 'tbridge') {
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        throw createError(400, '카카오 알림톡 발송 비용은 숫자로 입력해 주세요.');
+      }
+    } else if (!Number.isFinite(unitCost) || unitCost < 0) {
+      unitCost = 0;
     }
     const status = input.status === 'withdraw' ? 'withdraw' : 'active';
     const exists = await facilityRepository.findByCode(input.facilityCode);
@@ -290,6 +335,7 @@ export const facilityService = {
       masterPasswordHash,
       masterPassword,
       kakaoUnitCost: unitCost,
+      kakaoAccountType,
       status,
     });
     await facilityRepository.createDefaults(facility.id);
@@ -300,8 +346,21 @@ export const facilityService = {
       });
     }
 
+    if (kakaoAccountType === 'facility' && input.kakaoAlimtalkSettings) {
+      await facilityKakaoSettingsRepository.upsert(
+        facility.id,
+        normalizeKakaoSettingsInput(input.kakaoAlimtalkSettings)
+      );
+    }
+
     const created = await facilityRepository.findByCode(facility.facility_code);
-    return toSystemFacility(created);
+    const result = toSystemFacility(created);
+    if (kakaoAccountType === 'facility') {
+      result.kakaoAlimtalkSettings =
+        (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
+        emptyKakaoSettings();
+    }
+    return result;
   },
 
   async updateSettings(facilityCode, data) {
@@ -403,13 +462,22 @@ export const facilityService = {
       throw createError(400, '시설사 코드는 변경할 수 없습니다.');
     }
 
+    const kakaoAccountType =
+      data.kakaoAccountType === 'facility'
+        ? 'facility'
+        : data.kakaoAccountType === 'tbridge'
+          ? 'tbridge'
+          : facility.kakao_account_type === 'facility'
+            ? 'facility'
+            : 'tbridge';
+
     const patch = {
       name: data.name,
-      kakaoUnitCost: data.kakaoUnitCost,
       status: data.status,
+      kakaoAccountType,
     };
 
-    if (data.kakaoUnitCost != null) {
+    if (kakaoAccountType === 'tbridge' && data.kakaoUnitCost != null) {
       const unitCost = Number(data.kakaoUnitCost);
       if (!Number.isFinite(unitCost) || unitCost < 0) {
         throw createError(400, '카카오 알림톡 발송 비용은 숫자로 입력해 주세요.');
@@ -438,8 +506,42 @@ export const facilityService = {
       });
     }
 
+    if (
+      kakaoAccountType === 'facility' &&
+      Object.prototype.hasOwnProperty.call(data, 'kakaoAlimtalkSettings')
+    ) {
+      await facilityKakaoSettingsRepository.upsert(
+        facility.id,
+        normalizeKakaoSettingsInput(data.kakaoAlimtalkSettings)
+      );
+    }
+
     const updated = await facilityRepository.findByCode(facilityCode);
-    return toSystemFacility(updated);
+    const result = toSystemFacility(updated);
+    if (result.kakaoAccountType === 'facility') {
+      result.kakaoAlimtalkSettings =
+        (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
+        emptyKakaoSettings();
+    }
+    return result;
+  },
+
+  async getKakaoAlimtalkSettings(facilityCode) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    return (
+      (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
+      emptyKakaoSettings()
+    );
+  },
+
+  async saveKakaoAlimtalkSettings(facilityCode, input) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    return facilityKakaoSettingsRepository.upsert(
+      facility.id,
+      normalizeKakaoSettingsInput(input)
+    );
   },
 
   async listWaitingTypes(facilityCode) {
@@ -504,14 +606,25 @@ export const facilityService = {
       balance: Number(facility.kakao_balance || 0),
       unitCost: Number(facility.kakao_unit_cost || 20),
       warningThreshold: Number(facility.kakao_warning_threshold || 1000),
+      kakaoAccountType:
+        facility.kakao_account_type === 'facility' ? 'facility' : 'tbridge',
+      billingEnabled: facility.kakao_account_type !== 'facility',
       lowBalanceWarning:
+        facility.kakao_account_type !== 'facility' &&
         Number(facility.kakao_balance || 0) > 0 &&
         Number(facility.kakao_balance || 0) <=
           Number(facility.kakao_warning_threshold || 1000),
       insufficientBalance:
+        facility.kakao_account_type !== 'facility' &&
         Number(facility.kakao_balance || 0) < Number(facility.kakao_unit_cost || 20),
-      kakaoAlimtalkMode: isPpurioConfigured() ? 'live' : 'mock',
-      kakaoAlimtalkLive: isPpurioConfigured(),
+      kakaoAlimtalkMode:
+        facility.kakao_account_type === 'facility'
+          ? 'facility'
+          : isPpurioConfigured()
+            ? 'live'
+            : 'mock',
+      kakaoAlimtalkLive:
+        facility.kakao_account_type === 'facility' ? true : isPpurioConfigured(),
       paymentPgMode: nicepayService.getPublicConfig().mode,
       nicepayConfigured: nicepayService.isConfigured(),
       nicepayAllowMock: nicepayService.isMockAllowed(),
@@ -519,6 +632,11 @@ export const facilityService = {
   },
 
   async charge(facilityCode, amount, options = {}) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    if (facility.kakao_account_type === 'facility') {
+      throw createError(400, '시설사 계정 알림톡은 티브리지 충전을 사용하지 않습니다.');
+    }
     // 운영: MOCK 직접충전 금지 — NicePay prepare/return 경로만 허용
     if (!nicepayService.isMockAllowed()) {
       throw createError(
@@ -528,8 +646,6 @@ export const facilityService = {
           : '나이스페이 설정(NICEPAY_MID/NICEPAY_MERCHANT_KEY)이 필요합니다.'
       );
     }
-    const facility = await facilityRepository.findByCode(facilityCode);
-    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
     const value = Number(amount);
     if (!value || value <= 0) throw createError(400, '충전 금액을 확인해 주세요.');
     const { facility: updated } = await billingRepository.charge(facility.id, value, {
@@ -555,6 +671,8 @@ export const facilityService = {
       lowBalanceWarning:
         Number(updated.kakao_balance) > 0 &&
         Number(updated.kakao_balance) <= Number(updated.kakao_warning_threshold),
+      billingEnabled: true,
+      kakaoAccountType: 'tbridge',
     };
   },
 
@@ -562,6 +680,12 @@ export const facilityService = {
   async chargeBySystem(facilityCode, amount) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    if (facility.kakao_account_type === 'facility') {
+      throw createError(
+        400,
+        '시설사 계정 알림톡을 사용하는 시설사는 티브리지 충전 대상이 아닙니다.'
+      );
+    }
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       throw createError(400, '충전 금액을 확인해 주세요.');
@@ -599,6 +723,9 @@ export const facilityService = {
   async prepareNicepayCharge(facilityCode, amount) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    if (facility.kakao_account_type === 'facility') {
+      throw createError(400, '시설사 계정 알림톡은 티브리지 충전을 사용하지 않습니다.');
+    }
     const value = Number(amount);
     if (!Number.isFinite(value) || value < 1000) {
       throw createError(400, '충전 금액은 1,000원 이상이어야 합니다.');

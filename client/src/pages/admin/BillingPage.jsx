@@ -111,10 +111,18 @@ export default function BillingPage() {
   }, [facilityCode, facilityUser]);
 
   useEffect(() => {
+    if (billing?.billingEnabled === false && tab === 'charges') {
+      setTab('summary');
+    }
+  }, [billing?.billingEnabled, tab]);
+
+  useEffect(() => {
     if (!facilityUser || facilityUser.facilityCode !== facilityCode) return;
     if (tab === 'summary') loadSends().catch((e) => setToast(e.message));
-    else loadCharges().catch((e) => setToast(e.message));
-  }, [facilityCode, facilityUser, tab, page, pageSize]);
+    else if (billing?.billingEnabled !== false) {
+      loadCharges().catch((e) => setToast(e.message));
+    }
+  }, [facilityCode, facilityUser, tab, page, pageSize, billing?.billingEnabled]);
 
   if (!facilityUser || facilityUser.facilityCode !== facilityCode) {
     return <Navigate to={`/admin/${facilityCode}/login`} replace />;
@@ -182,18 +190,20 @@ export default function BillingPage() {
                 setPage(1);
               }}
             >
-              집계 / 충전
+              {billing?.billingEnabled === false ? '집계' : '집계 / 충전'}
             </button>
-            <button
-              type="button"
-              className={`chip ${tab === 'charges' ? 'active' : ''}`}
-              onClick={() => {
-                setTab('charges');
-                setPage(1);
-              }}
-            >
-              충전 내역
-            </button>
+            {billing?.billingEnabled !== false && (
+              <button
+                type="button"
+                className={`chip ${tab === 'charges' ? 'active' : ''}`}
+                onClick={() => {
+                  setTab('charges');
+                  setPage(1);
+                }}
+              >
+                충전 내역
+              </button>
+            )}
           </div>
         </div>
 
@@ -217,18 +227,32 @@ export default function BillingPage() {
           </div>
         )}
 
+        {billing?.kakaoAccountType === 'facility' && (
+          <div className="admin-alert" role="status">
+            카카오 알림톡: 시설사 자체 계정 사용 중 (티브리지 충전 없음)
+          </div>
+        )}
+
         {tab === 'summary' && (
           <>
             <div className="billing-balance-bar">
-              <div>
-                잔액: <strong>{Number(billing?.balance || 0).toLocaleString()}</strong>원
-              </div>
-              <div>
-                건당 비용: <strong>{Number(billing?.unitCost || 0).toLocaleString()}</strong>원
-              </div>
-              <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
-                충전하기
-              </button>
+              {billing?.billingEnabled !== false && (
+                <>
+                  <div>
+                    잔액: <strong>{Number(billing?.balance || 0).toLocaleString()}</strong>원
+                  </div>
+                  <div>
+                    건당 비용:{' '}
+                    <strong>{Number(billing?.unitCost || 0).toLocaleString()}</strong>원
+                  </div>
+                  <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
+                    충전하기
+                  </button>
+                </>
+              )}
+              {billing?.billingEnabled === false && (
+                <div className="muted">시설사 계정 알림톡 — 티브리지 충전/잔액 없음</div>
+              )}
             </div>
 
             <div className="filter-row" style={{ marginBottom: 16 }}>
