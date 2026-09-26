@@ -85,16 +85,24 @@ export default function SignagePage() {
     ]);
     const nextPending = board.pending || [];
     const nextCompleted = board.completed || [];
-    // 최근 입장 호출: 호출(calledAt) 이력이 있는 완료 건만 (입장하기만 한 건 제외)
+    // 최근 입장 호출: calledAt 있는 완료 건 (호출 후 입장 / 입장하기 직완료)
     const nextRecent =
       board.recentCalled ||
       nextCompleted.filter((item) => item.calledAt);
-    const nextActive =
-      board.currentlyCalled ||
+    const pendingCalled =
       nextPending
         .filter((item) => item.calledAt)
-        .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] ||
-      null;
+        .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
+    const latestCompletedCalled =
+      nextRecent
+        .slice()
+        .sort((a, b) => {
+          const aAt = new Date(a.completedAt || a.calledAt).getTime();
+          const bAt = new Date(b.completedAt || b.calledAt).getTime();
+          return bAt - aAt;
+        })[0] || null;
+    const nextActive =
+      board.currentlyCalled || pendingCalled || latestCompletedCalled || null;
 
     const nextCalledId = nextActive?.id || null;
 
@@ -165,11 +173,14 @@ export default function SignagePage() {
     );
   }
 
+  const activeCallIsPending = Boolean(
+    activeCall && pending.some((w) => w.id === activeCall.id)
+  );
   const waitingCount = Math.max(
     0,
-    (facility.pendingCount ?? pending.length) - (activeCall ? 1 : 0)
+    (facility.pendingCount ?? pending.length) - (activeCallIsPending ? 1 : 0)
   );
-  const waitingPeople = (activeCall
+  const waitingPeople = (activeCallIsPending
     ? pending.filter((w) => w.id !== activeCall.id)
     : pending
   ).reduce((sum, w) => sum + Number(w.totalCount || 0), 0);

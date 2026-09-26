@@ -170,15 +170,30 @@ export const waitingService = {
     const mappedCompleted = completed.map((r, i) => mapWaiting(r, i));
     const entryWaitMinutes = Math.max(1, Number(facility.entry_wait_minutes || 5));
 
-    // 사이니지 "입장 호출": [호출]로 calledAt 이 찍힌 pending 만 표시
-    // [입장하기]만 한 완료 건은 표시하지 않음
-    const currentlyCalled =
+    // 사이니지 "입장 호출": 진행 중 호출(pending+calledAt) 우선,
+    // 없으면 [입장하기]로 완료된 최신 호출 건(completed+calledAt)
+    const pendingCalled =
       mappedPending
         .filter((w) => w.calledAt)
         .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))[0] || null;
+    const latestCompletedCalled =
+      mappedCompleted
+        .filter((w) => w.calledAt)
+        .sort((a, b) => {
+          const aAt = new Date(a.completedAt || a.calledAt).getTime();
+          const bAt = new Date(b.completedAt || b.calledAt).getTime();
+          return bAt - aAt;
+        })[0] || null;
+    const currentlyCalled = pendingCalled || latestCompletedCalled || null;
 
-    // 최근 입장 호출: 실제 호출(calledAt) 후 완료된 건만
-    const recentCalled = mappedCompleted.filter((w) => w.calledAt);
+    // 최근 입장 호출: calledAt 있는 완료 건 (호출 후 입장 / 입장하기 직완료 포함)
+    const recentCalled = mappedCompleted
+      .filter((w) => w.calledAt)
+      .sort((a, b) => {
+        const aAt = new Date(a.completedAt || a.calledAt).getTime();
+        const bAt = new Date(b.completedAt || b.calledAt).getTime();
+        return bAt - aAt;
+      });
 
     return {
       counts,

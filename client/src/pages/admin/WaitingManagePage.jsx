@@ -150,7 +150,7 @@ export default function WaitingManagePage() {
   const complete = async () => {
     if (!selected) return;
     try {
-      // 입장하기: 입장 안내 알림톡·사이니지 호출 표시 없음 (호출 API 호출하지 않음)
+      // 입장하기 → 서버에서 called_at 기록 + 사이니지 입장호출/최근호출 반영
       const result = await api(
         `/admin/${facilityCode}/waitings/${selected.id}/complete`,
         { method: 'POST', body: '{}' }

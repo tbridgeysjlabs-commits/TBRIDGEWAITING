@@ -201,9 +201,14 @@ export const waitingRepository = {
   },
 
   async complete(id) {
+    // 사이니지 입장호출/최근호출 표시용 — 호출 없이 입장하기만 해도 called_at 기록
+    // (이미 호출된 건은 기존 called_at 유지, 데드라인은 건드리지 않음)
     const { rows } = await query(
       `UPDATE waitings
-       SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+       SET status = 'completed',
+           completed_at = NOW(),
+           called_at = COALESCE(called_at, NOW()),
+           updated_at = NOW()
        WHERE id = $1 AND status = 'pending'
        RETURNING *`,
       [id]
