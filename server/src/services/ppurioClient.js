@@ -8,10 +8,16 @@
  * Base URL 기본값: https://message.ppurio.com (뿌리오 문자/카카오톡 연동 API)
  * 문서 도메인이 다르면 PPURIO_API_BASE_URL 로만 덮어쓰면 됩니다. (보통은 env 생략 가능)
  *
+ * HTTP 프록시(선택):
+ * - PROXY_HOST 가 있으면 해당 호스트:PROXY_PORT(기본 3128) 경유
+ * - PROXY_HOST 미설정 시 기존처럼 직접 호출
+ *
  * 참고: 발신프로필/템플릿(ppur_…)이 다른 계정에만 등록돼 있었다면
  * 뿌리오 계정에서 발신프로필 등록 + 템플릿 재심사가 필요할 수 있습니다.
  * Render 배포 시 [연동신청관리]에 운영 서버 IP 등록이 필요할 수 있습니다.
  */
+
+import { ProxyAgent, fetch as undiciFetch } from 'undici';
 
 /** 뿌리오 연동 API 기본 도메인 — 대부분 프로젝트에서 이 값을 고정 사용 */
 const DEFAULT_PPURIO_API_BASE_URL = 'https://message.ppurio.com';
@@ -22,10 +28,45 @@ let tokenCache = {
   expiresAt: 0,
 };
 
+/** @type {import('undici').ProxyAgent | null} */
+let proxyAgent = null;
+let proxyLogged = false;
+
 function apiBase() {
   return (process.env.PPURIO_API_BASE_URL || DEFAULT_PPURIO_API_BASE_URL)
     .trim()
     .replace(/\/$/, '');
+}
+
+/** PROXY_HOST 설정 시에만 프록시 URL 반환, 없으면 null(직접 호출) */
+function getProxyUrl() {
+  const host = String(process.env.PROXY_HOST || '').trim();
+  if (!host) return null;
+  const portRaw = String(process.env.PROXY_PORT || '3128').trim();
+  const port = /^\d+$/.test(portRaw) ? portRaw : '3128';
+  return `http://${host}:${port}`;
+}
+
+function getProxyDispatcher() {
+  const proxyUrl = getProxyUrl();
+  if (!proxyUrl) return undefined;
+  if (!proxyAgent) {
+    proxyAgent = new ProxyAgent(proxyUrl);
+  }
+  if (!proxyLogged) {
+    proxyLogged = true;
+    console.log(`[ppurio] HTTP proxy enabled → ${proxyUrl}`);
+  }
+  return proxyAgent;
+}
+
+/** undici fetch — PROXY_HOST 있을 때만 dispatcher(proxy) 주입 */
+async function ppurioFetch(url, options = {}) {
+  const dispatcher = getProxyDispatcher();
+  if (dispatcher) {
+    return undiciFetch(url, { ...options, dispatcher });
+  }
+  return undiciFetch(url, options);
 }
 
 export function isPpurioConfigured() {
@@ -55,18 +96,19 @@ async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** /v1/token 호출 직전 — 이 서버의 아웃바운드 공인 IP 확인용 (IP 화이트리스트 디버깅) */
+/** /v1/token 호출 직전 — 이 서버(또는 프록시)의 아웃바운드 공인 IP 확인용 */
 async function logOutboundPublicIp() {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch('https://api.ipify.org?format=json', {
+    const res = await ppurioFetch('https://api.ipify.org?format=json', {
       signal: controller.signal,
     });
     clearTimeout(timer);
     const data = await res.json().catch(() => ({}));
     const ip = data.ip || '(unknown)';
-    console.log('[outbound IP]', ip);
+    const via = getProxyUrl() ? 'proxy' : 'direct';
+    console.log(`[outbound IP] ${ip} (${via})`);
   } catch (err) {
     console.warn('[outbound IP] lookup failed:', String(err?.message || err));
   }
@@ -76,7 +118,7 @@ async function fetchJson(url, options, { retries = 2 } = {}) {
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const res = await fetch(url, options);
+    const res = await ppurioFetch(url, options);
     if (res.status === 429 && attempt < retries) {
       const backoff = 400 * 2 ** attempt;
       console.warn(`[ppurio] rate limit 429 — retry in ${backoff}ms`);
