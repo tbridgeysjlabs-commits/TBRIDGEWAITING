@@ -257,23 +257,27 @@ function buildButtons(templateKey, changeWord = {}) {
 export function isBizppurioSettingsReady(settings) {
   if (!settings) return false;
   const account = String(settings.resellerId || '').trim();
-  const secret = String(settings.resellerApiKey || settings.resellerPw || '').trim();
+  // 비즈뿌리오 Basic = 계정:암호 (문서). API키는 보조.
+  const secret = String(settings.resellerPw || settings.resellerApiKey || '').trim();
   const senderkey = String(settings.senderProfile || '').trim();
   const from = String(settings.senderPhone || '').replace(/\D/g, '');
   return Boolean(account && secret && senderkey && from.length >= 8);
 }
 
-async function fetchAccessToken(settings) {
-  const base = normalizeBaseUrl(settings.resellerApiUrl);
-  const account = String(settings.resellerId || '').trim();
-  const secret = String(settings.resellerApiKey || settings.resellerPw || '').trim();
-  if (!account || !secret) {
-    throw new Error('[bizppurio] 계정(ID) 또는 인증키/비밀번호가 없습니다.');
-  }
+/** Basic 인증에 쓸 비밀값 후보 (암호 우선, 다르면 API키도 시도) */
+function authSecretCandidates(settings) {
+  const pw = String(settings.resellerPw || '').trim();
+  const key = String(settings.resellerApiKey || '').trim();
+  const list = [];
+  if (pw) list.push({ kind: 'pw', secret: pw });
+  if (key && key !== pw) list.push({ kind: 'apiKey', secret: key });
+  return list;
+}
 
+async function requestToken(base, account, secret) {
   const tokenUrl = `${base}/v1/token`;
   const basic = Buffer.from(`${account}:${secret}`, 'utf8').toString('base64');
-  // 문서: Headers만 설정 (Body 없음). 빈 JSON body 도 허용되나 생략이 안전.
+  // 문서: Headers만 설정 (Body 없음)
   const res = await httpFetch(tokenUrl, {
     method: 'POST',
     headers: {
@@ -283,28 +287,65 @@ async function fetchAccessToken(settings) {
     },
   });
   const data = await res.json().catch(() => ({}));
-  const token = data.accesstoken || data.token || data.access_token;
-  const type = data.type || 'Bearer';
-  if (!res.ok || !token) {
-    const msg = data.description || data.message || `token HTTP ${res.status}`;
-    console.error('[bizppurio] token failed', {
-      url: tokenUrl,
-      http: res.status,
-      code: data.code,
-      description: msg,
-      account,
-    });
-    throw new Error(`[bizppurio] 토큰 발급 실패: ${msg}`);
+  return { tokenUrl, res, data };
+}
+
+async function fetchAccessToken(settings) {
+  const base = normalizeBaseUrl(settings.resellerApiUrl);
+  const account = String(settings.resellerId || '').trim();
+  const candidates = authSecretCandidates(settings);
+  if (!account || !candidates.length) {
+    throw new Error('[bizppurio] 계정(ID) 또는 딜러사 PW/인증키가 없습니다.');
   }
 
-  const entry = {
-    token,
-    type,
-    expiresAt: parseExpired(data.expired),
-  };
-  tokenCacheByAccount.set(account, entry);
-  console.log('[bizppurio] token ok', { url: tokenUrl, account, expired: data.expired });
-  return entry;
+  let last = null;
+  for (const { kind, secret } of candidates) {
+    const { tokenUrl, res, data } = await requestToken(base, account, secret);
+    const token = data.accesstoken || data.token || data.access_token;
+    const type = data.type || 'Bearer';
+    if (res.ok && token) {
+      const entry = {
+        token,
+        type,
+        expiresAt: parseExpired(data.expired),
+      };
+      tokenCacheByAccount.set(account, entry);
+      console.log('[bizppurio] token ok', {
+        url: tokenUrl,
+        account,
+        auth: kind,
+        expired: data.expired,
+      });
+      return entry;
+    }
+    last = { tokenUrl, res, data, kind };
+    const code = String(data.code ?? '');
+    // 암호 오류(3007)이고 다른 후보가 있으면 다음 시도
+    if (code === '3007' && candidates.length > 1) {
+      console.warn('[bizppurio] token 3007 with', kind, '— trying next secret');
+      continue;
+    }
+    break;
+  }
+
+  const data = last?.data || {};
+  const msg =
+    data.description ||
+    data.message ||
+    `token HTTP ${last?.res?.status || '?'}`;
+  console.error('[bizppurio] token failed', {
+    url: last?.tokenUrl,
+    http: last?.res?.status,
+    code: data.code,
+    description: msg,
+    account,
+    authTried: candidates.map((c) => c.kind),
+  });
+  const hint =
+    String(data.code) === '3007'
+      ? ' (비즈뿌리오 계정 암호를 «딜러사 PW»에 넣어 주세요. API 인증키와 다를 수 있습니다.)'
+      : '';
+  throw new Error(`[bizppurio] 토큰 발급 실패: ${msg}${hint}`);
 }
 
 async function getAccessToken(settings) {

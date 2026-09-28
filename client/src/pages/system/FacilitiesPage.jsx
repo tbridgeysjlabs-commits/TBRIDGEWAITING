@@ -103,12 +103,12 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerPw',
     label: '카카오 알림톡 중계사(딜러사) PW',
-    placeholder: '카카오 알림톡 중계사(딜러사) PW 입력',
+    placeholder: '비즈뿌리오 로그인 암호 (계정:암호)',
   },
   {
     key: 'resellerApiKey',
     label: '카카오 알림톡 중계사 API 인증키',
-    placeholder: '카카오 알림톡 중계사 API 인증키 입력',
+    placeholder: '없으면 비워두기 — 보통 딜러사 PW만 사용',
   },
   { key: 'senderPhone', label: '발신번호', placeholder: '발신번호 입력' },
   {
