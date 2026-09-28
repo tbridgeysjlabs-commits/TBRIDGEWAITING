@@ -569,6 +569,19 @@ export const facilityService = {
     return maskKakaoSettingsSecrets(saved) || emptyKakaoSettings();
   },
 
+  async testKakaoAlimtalkAuth(facilityCode) {
+    const facility = await facilityRepository.findByCode(facilityCode);
+    if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    const settings = await facilityKakaoSettingsRepository.findByFacilityId(
+      facility.id
+    );
+    if (!settings) {
+      throw createError(400, '시설사 카카오 알림톡 설정이 없습니다.');
+    }
+    const { testFacilityKakaoAuth } = await import('./bizppurioClient.js');
+    return testFacilityKakaoAuth(settings);
+  },
+
   async listWaitingTypes(facilityCode) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');

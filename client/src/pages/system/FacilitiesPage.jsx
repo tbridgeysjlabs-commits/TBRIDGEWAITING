@@ -52,6 +52,8 @@ const emptyKakaoSettings = () => ({
   resellerApiKey: '',
   hasResellerPw: false,
   hasResellerApiKey: false,
+  resellerPwLen: 0,
+  resellerApiKeyLen: 0,
   clearResellerPw: false,
   clearResellerApiKey: false,
   senderPhone: '',
@@ -169,6 +171,7 @@ export default function FacilitiesPage() {
   const [initialSnapshot, setInitialSnapshot] = useState('');
   const [kakaoSettingsOpen, setKakaoSettingsOpen] = useState(false);
   const [kakaoSettingsDraft, setKakaoSettingsDraft] = useState(emptyKakaoSettings());
+  const [kakaoTestResult, setKakaoTestResult] = useState('');
   const [toast, setToast] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [statusActive, setStatusActive] = useState(true);
@@ -321,7 +324,51 @@ export default function FacilitiesPage() {
     setOpen(true);
   };
 
-  const openKakaoSettings = () => {
+  const testKakaoAuth = async () => {
+    if (mode !== 'edit' || !form.facilityCode) {
+      showToast('시설사를 먼저 등록·수정으로 저장한 뒤 연결 테스트하세요.');
+      return;
+    }
+    setKakaoTestResult('연결 테스트 중…');
+    try {
+      if (form.kakaoAccountType === 'facility' && form.kakaoAlimtalkSettings) {
+        const saved = await api(
+          `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}/kakao-alimtalk-settings`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(form.kakaoAlimtalkSettings),
+          },
+          'system'
+        );
+        setForm((prev) => ({
+          ...prev,
+          kakaoAlimtalkSettings: {
+            ...emptyKakaoSettings(),
+            ...(prev.kakaoAlimtalkSettings || {}),
+            ...saved,
+            resellerPw: prev.kakaoAlimtalkSettings?.resellerPw || '',
+            resellerApiKey: '',
+          },
+        }));
+      }
+      const result = await api(
+        `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}/kakao-alimtalk-settings/test`,
+        { method: 'POST', body: '{}' },
+        'system'
+      );
+      const text = result?.ok
+        ? `연결 성공 · ${result.provider} · PW ${result.pwLen}자 · 인증키 ${result.apiKeyLen}자`
+        : `연결 실패 · PW ${result?.pwLen ?? 0}자 · 인증키 ${result?.apiKeyLen ?? 0}자\n${result?.message || '인증 오류'}`;
+      setKakaoTestResult(text);
+      showToast(result?.ok ? '알림톡 계정 연결 성공' : '알림톡 계정 연결 실패');
+      window.alert(text);
+    } catch (err) {
+      const text = err.message || '연결 테스트 실패';
+      setKakaoTestResult(text);
+      showToast(text);
+      window.alert(text);
+    }
+  };
     const current = form.kakaoAlimtalkSettings || emptyKakaoSettings();
     setKakaoSettingsDraft({
       ...emptyKakaoSettings(),
@@ -340,7 +387,6 @@ export default function FacilitiesPage() {
       const prevSettings = prev.kakaoAlimtalkSettings || emptyKakaoSettings();
       const draft = kakaoSettingsDraft || emptyKakaoSettings();
 
-      // 비밀란이 비어 있고 «삭제»가 아니면 기존 입력/저장값을 유지 (화면에는 안 보여도 됨)
       const resellerPw = draft.clearResellerPw
         ? ''
         : String(draft.resellerPw || '').trim() || prevSettings.resellerPw || '';
@@ -366,12 +412,22 @@ export default function FacilitiesPage() {
           hasResellerApiKey: draft.clearResellerApiKey
             ? false
             : Boolean(resellerApiKey || prevSettings.hasResellerApiKey),
+          resellerPwLen: draft.clearResellerPw
+            ? 0
+            : resellerPw
+              ? resellerPw.length
+              : Number(prevSettings.resellerPwLen) || 0,
+          resellerApiKeyLen: draft.clearResellerApiKey
+            ? 0
+            : resellerApiKey
+              ? resellerApiKey.length
+              : Number(prevSettings.resellerApiKeyLen) || 0,
         },
       };
     });
     setKakaoSettingsOpen(false);
     showToast(
-      '설정이 임시 저장되었습니다. PW는 보안상 다시 보이지 않습니다. 시설사 «수정»으로 최종 반영하세요.'
+      '설정이 임시 저장되었습니다. PW 칸이 비어 보여도 정상입니다. 시설사 «수정»으로 최종 반영하세요.'
     );
   };
 
@@ -713,13 +769,24 @@ export default function FacilitiesPage() {
                   />
                 </label>
               ) : (
-                <button
-                  type="button"
-                  className="btn-dark facility-kakao-settings-btn"
-                  onClick={openKakaoSettings}
-                >
-                  시설사 계정 카카오 알림톡 설정
-                </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn-dark facility-kakao-settings-btn"
+                    onClick={openKakaoSettings}
+                  >
+                    시설사 계정 카카오 알림톡 설정
+                  </button>
+                  {mode === 'edit' ? (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={testKakaoAuth}
+                    >
+                      알림톡 계정 연결 테스트
+                    </button>
+                  ) : null}
+                </div>
               )}
               <label>
                 상태
@@ -778,17 +845,82 @@ export default function FacilitiesPage() {
                 <AdminCloseIcon />
               </button>
               <h2>시설사 계정 카카오 알림톡</h2>
-              <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: 13 }}>
-                PW·API 인증키는 보안상 <strong>저장 후에도 칸이 비어 보입니다</strong>.
-                옆에 «(저장됨)»이 있으면 값이 유지된 상태입니다. 지울 때만 «삭제»를 누르세요.
-                최종 반영은 이 창 저장 후 시설사 «수정»이 필요합니다.
-              </p>
+              <div
+                className="muted"
+                style={{
+                  marginTop: 0,
+                  marginBottom: 12,
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  padding: '10px 12px',
+                  background: 'rgba(0,0,0,0.04)',
+                  borderRadius: 8,
+                }}
+              >
+                <div>
+                  딜러사 PW:{' '}
+                  <strong>
+                    {kakaoSettingsDraft.clearResellerPw
+                      ? '삭제 예정'
+                      : kakaoSettingsDraft.hasResellerPw ||
+                          Number(kakaoSettingsDraft.resellerPwLen) > 0 ||
+                          String(kakaoSettingsDraft.resellerPw || '').trim()
+                        ? `저장됨 (${
+                            String(kakaoSettingsDraft.resellerPw || '').trim()
+                              .length ||
+                            Number(kakaoSettingsDraft.resellerPwLen) ||
+                            '?'
+                          }자) — 칸이 비어 보이는 것이 정상`
+                        : '없음'}
+                  </strong>
+                </div>
+                <div>
+                  API 인증키:{' '}
+                  <strong>
+                    {kakaoSettingsDraft.clearResellerApiKey
+                      ? '삭제 예정'
+                      : kakaoSettingsDraft.hasResellerApiKey ||
+                          Number(kakaoSettingsDraft.resellerApiKeyLen) > 0 ||
+                          String(kakaoSettingsDraft.resellerApiKey || '').trim()
+                        ? `저장됨 (${
+                            String(kakaoSettingsDraft.resellerApiKey || '').trim()
+                              .length ||
+                            Number(kakaoSettingsDraft.resellerApiKeyLen) ||
+                            '?'
+                          }자)`
+                        : '없음 (정상)'}
+                  </strong>
+                </div>
+              </div>
+              {kakaoTestResult ? (
+                <pre
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    fontSize: 12,
+                    margin: '0 0 12px',
+                    padding: 10,
+                    background: 'rgba(0,0,0,0.06)',
+                    borderRadius: 8,
+                  }}
+                >
+                  {kakaoTestResult}
+                </pre>
+              ) : null}
               {KAKAO_SETTINGS_FIELDS.map((field) => (
                 <label key={field.key}>
                   {field.label}
                   {field.secret && kakaoSettingsDraft[field.hasKey] && !kakaoSettingsDraft[field.clearKey] ? (
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
-                      (저장됨)
+                      (저장됨
+                      {field.hasKey === 'hasResellerPw' &&
+                      Number(kakaoSettingsDraft.resellerPwLen) > 0
+                        ? ` · ${kakaoSettingsDraft.resellerPwLen}자`
+                        : ''}
+                      {field.hasKey === 'hasResellerApiKey' &&
+                      Number(kakaoSettingsDraft.resellerApiKeyLen) > 0
+                        ? ` · ${kakaoSettingsDraft.resellerApiKeyLen}자`
+                        : ''}
+                      )
                     </span>
                   ) : null}
                   {field.secret && kakaoSettingsDraft[field.clearKey] ? (

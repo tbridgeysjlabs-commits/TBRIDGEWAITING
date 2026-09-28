@@ -379,6 +379,7 @@ async function fetchAccessToken(settings) {
         http: res.status,
         code,
         desc,
+        secretLen: secret.length,
       });
       if (target.provider === 'bizppurio' && code === '3007') {
         bizppurioPasswordWrong = true;
@@ -644,4 +645,35 @@ export async function sendBizppurioAlimtalk({
 export function clearBizppurioTokenCache(account) {
   if (account) tokenCacheByAccount.delete(String(account));
   else tokenCacheByAccount.clear();
+}
+
+/**
+ * 시설사 설정으로 토큰 발급만 시험 (발송 없음).
+ * @returns {Promise<{ ok: boolean, account: string, provider?: string, code?: string, message: string, pwLen: number, apiKeyLen: number }>}
+ */
+export async function testFacilityKakaoAuth(settings) {
+  const account = String(settings?.resellerId || '').trim();
+  const pwLen = String(settings?.resellerPw || '').trim().length;
+  const apiKeyLen = String(settings?.resellerApiKey || '').trim().length;
+  clearBizppurioTokenCache(account);
+  try {
+    const auth = await fetchAccessToken(settings);
+    return {
+      ok: true,
+      account,
+      provider: auth.provider,
+      base: auth.base,
+      message: `토큰 발급 성공 (${auth.provider})`,
+      pwLen,
+      apiKeyLen,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      account,
+      message: String(err?.message || err),
+      pwLen,
+      apiKeyLen,
+    };
+  }
 }

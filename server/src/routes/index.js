@@ -225,6 +225,11 @@ router.put(
   requireAuth(['system_admin']),
   facilityController.saveKakaoAlimtalkSettings
 );
+router.post(
+  '/system-admin/facilities/:facilityCode/kakao-alimtalk-settings/test',
+  requireAuth(['system_admin']),
+  facilityController.testKakaoAlimtalkAuth
+);
 router.get(
   '/system-admin/history',
   requireAuth(['system_admin']),

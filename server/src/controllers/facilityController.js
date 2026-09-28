@@ -153,6 +153,16 @@ export const facilityController = {
     }
   },
 
+  async testKakaoAlimtalkAuth(req, res, next) {
+    try {
+      res.json(
+        await facilityService.testKakaoAlimtalkAuth(req.params.facilityCode)
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async updateSettings(req, res, next) {
     try {
       res.json(await facilityService.updateSettings(req.params.facilityCode, req.body));

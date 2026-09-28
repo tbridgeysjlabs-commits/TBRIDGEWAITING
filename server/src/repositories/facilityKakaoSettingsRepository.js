@@ -14,6 +14,8 @@ function mapRow(row, { decrypt = true } = {}) {
     resellerApiKey: key,
     hasResellerPw: Boolean(pw),
     hasResellerApiKey: Boolean(key),
+    resellerPwLen: pw.length,
+    resellerApiKeyLen: key.length,
     senderPhone: row.sender_phone || '',
     senderProfile: row.sender_profile || '',
     templateWaitingRegistered: row.template_waiting_registered || '',
@@ -26,15 +28,27 @@ function mapRow(row, { decrypt = true } = {}) {
   };
 }
 
-/** API/UI 응답용 — 비밀값은 내려주지 않음 */
+/** API/UI 응답용 — 비밀값은 내려주지 않음 (길이만 표시) */
 export function maskKakaoSettingsSecrets(settings) {
   if (!settings) return null;
+  const pwLen =
+    Number(settings.resellerPwLen) ||
+    String(settings.resellerPw || '').length ||
+    0;
+  const keyLen =
+    Number(settings.resellerApiKeyLen) ||
+    String(settings.resellerApiKey || '').length ||
+    0;
+  const hasPw = Boolean(settings.hasResellerPw ?? pwLen);
+  const hasKey = Boolean(settings.hasResellerApiKey ?? keyLen);
   return {
     ...settings,
     resellerPw: '',
     resellerApiKey: '',
-    hasResellerPw: Boolean(settings.hasResellerPw ?? settings.resellerPw),
-    hasResellerApiKey: Boolean(settings.hasResellerApiKey ?? settings.resellerApiKey),
+    hasResellerPw: hasPw,
+    hasResellerApiKey: hasKey,
+    resellerPwLen: hasPw ? pwLen : 0,
+    resellerApiKeyLen: hasKey ? keyLen : 0,
     clearResellerPw: false,
     clearResellerApiKey: false,
   };
