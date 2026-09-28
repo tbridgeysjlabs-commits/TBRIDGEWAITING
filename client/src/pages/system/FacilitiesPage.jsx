@@ -50,6 +50,10 @@ const emptyKakaoSettings = () => ({
   resellerId: '',
   resellerPw: '',
   resellerApiKey: '',
+  hasResellerPw: false,
+  hasResellerApiKey: false,
+  clearResellerPw: false,
+  clearResellerApiKey: false,
   senderPhone: '',
   senderProfile: '',
   templateWaitingRegistered: '',
@@ -103,12 +107,18 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerPw',
     label: '카카오 알림톡 중계사(딜러사) PW',
-    placeholder: '비즈뿌리오: 로그인 암호 / 뿌리오: 비워도 됨',
+    placeholder: '비즈뿌리오: 로그인 암호 (변경 시에만 입력)',
+    secret: true,
+    hasKey: 'hasResellerPw',
+    clearKey: 'clearResellerPw',
   },
   {
     key: 'resellerApiKey',
     label: '카카오 알림톡 중계사 API 인증키',
-    placeholder: '뿌리오: 연동인증키 / 비즈뿌리오: 없으면 비움',
+    placeholder: '뿌리오: 연동인증키 (변경 시에만 입력)',
+    secret: true,
+    hasKey: 'hasResellerApiKey',
+    clearKey: 'clearResellerApiKey',
   },
   { key: 'senderPhone', label: '발신번호', placeholder: '발신번호 입력' },
   {
@@ -312,9 +322,15 @@ export default function FacilitiesPage() {
   };
 
   const openKakaoSettings = () => {
+    const current = form.kakaoAlimtalkSettings || emptyKakaoSettings();
     setKakaoSettingsDraft({
       ...emptyKakaoSettings(),
-      ...(form.kakaoAlimtalkSettings || {}),
+      ...current,
+      // 비밀값은 화면에 다시 채우지 않음 (변경 시에만 입력)
+      resellerPw: '',
+      resellerApiKey: '',
+      clearResellerPw: false,
+      clearResellerApiKey: false,
     });
     setKakaoSettingsOpen(true);
   };
@@ -322,7 +338,24 @@ export default function FacilitiesPage() {
   const saveKakaoSettingsDraft = () => {
     setForm((prev) => ({
       ...prev,
-      kakaoAlimtalkSettings: { ...kakaoSettingsDraft },
+      kakaoAlimtalkSettings: {
+        ...emptyKakaoSettings(),
+        ...(prev.kakaoAlimtalkSettings || {}),
+        ...kakaoSettingsDraft,
+        // 삭제 예약 시 has 플래그도 즉시 반영(미리보기)
+        hasResellerPw: kakaoSettingsDraft.clearResellerPw
+          ? false
+          : Boolean(
+              kakaoSettingsDraft.resellerPw ||
+                prev.kakaoAlimtalkSettings?.hasResellerPw
+            ),
+        hasResellerApiKey: kakaoSettingsDraft.clearResellerApiKey
+          ? false
+          : Boolean(
+              kakaoSettingsDraft.resellerApiKey ||
+                prev.kakaoAlimtalkSettings?.hasResellerApiKey
+            ),
+      },
     }));
     setKakaoSettingsOpen(false);
     showToast('시설사 계정 설정이 임시 저장되었습니다. 등록/수정으로 반영하세요.');
@@ -731,20 +764,61 @@ export default function FacilitiesPage() {
                 <AdminCloseIcon />
               </button>
               <h2>시설사 계정 카카오 알림톡</h2>
+              <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: 13 }}>
+                PW·API 인증키는 보안상 다시 표시되지 않습니다. 변경할 때만 입력하고,
+                저장된 값을 지우려면 «삭제»를 누른 뒤 시설사 수정으로 반영하세요.
+              </p>
               {KAKAO_SETTINGS_FIELDS.map((field) => (
                 <label key={field.key}>
                   {field.label}
-                  <input
-                    type="text"
-                    value={kakaoSettingsDraft[field.key] || ''}
-                    placeholder={field.placeholder}
-                    onChange={(e) =>
-                      setKakaoSettingsDraft({
-                        ...kakaoSettingsDraft,
-                        [field.key]: e.target.value,
-                      })
-                    }
-                  />
+                  {field.secret && kakaoSettingsDraft[field.hasKey] && !kakaoSettingsDraft[field.clearKey] ? (
+                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
+                      (저장됨)
+                    </span>
+                  ) : null}
+                  {field.secret && kakaoSettingsDraft[field.clearKey] ? (
+                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
+                      (삭제 예정)
+                    </span>
+                  ) : null}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      style={{ flex: 1 }}
+                      value={kakaoSettingsDraft[field.key] || ''}
+                      placeholder={
+                        field.secret && kakaoSettingsDraft[field.hasKey] && !kakaoSettingsDraft[field.clearKey]
+                          ? '저장됨 — 변경 시에만 입력'
+                          : field.placeholder
+                      }
+                      onChange={(e) =>
+                        setKakaoSettingsDraft({
+                          ...kakaoSettingsDraft,
+                          [field.key]: e.target.value,
+                          ...(field.secret
+                            ? { [field.clearKey]: false }
+                            : null),
+                        })
+                      }
+                    />
+                    {field.secret ? (
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={() =>
+                          setKakaoSettingsDraft({
+                            ...kakaoSettingsDraft,
+                            [field.key]: '',
+                            [field.clearKey]: true,
+                            [field.hasKey]: false,
+                          })
+                        }
+                      >
+                        삭제
+                      </button>
+                    ) : null}
+                  </div>
                 </label>
               ))}
               <div className="modal-actions" style={{ justifyContent: 'space-between' }}>

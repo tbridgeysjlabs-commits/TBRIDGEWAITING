@@ -3,13 +3,17 @@ import { decryptSecret, encryptSecret } from '../utils/secretBox.js';
 
 function mapRow(row, { decrypt = true } = {}) {
   if (!row) return null;
+  const pw = decrypt ? decryptSecret(row.reseller_pw) : '';
+  const key = decrypt ? decryptSecret(row.reseller_api_key) : '';
   return {
     facilityId: row.facility_id,
     resellerName: row.reseller_name || '',
     resellerApiUrl: row.reseller_api_url || '',
     resellerId: row.reseller_id || '',
-    resellerPw: decrypt ? decryptSecret(row.reseller_pw) : '',
-    resellerApiKey: decrypt ? decryptSecret(row.reseller_api_key) : '',
+    resellerPw: pw,
+    resellerApiKey: key,
+    hasResellerPw: Boolean(pw),
+    hasResellerApiKey: Boolean(key),
     senderPhone: row.sender_phone || '',
     senderProfile: row.sender_profile || '',
     templateWaitingRegistered: row.template_waiting_registered || '',
@@ -20,6 +24,28 @@ function mapRow(row, { decrypt = true } = {}) {
     templateWaitingCancelled: row.template_waiting_cancelled || '',
     updatedAt: row.updated_at,
   };
+}
+
+/** API/UI 응답용 — 비밀값은 내려주지 않음 */
+export function maskKakaoSettingsSecrets(settings) {
+  if (!settings) return null;
+  return {
+    ...settings,
+    resellerPw: '',
+    resellerApiKey: '',
+    hasResellerPw: Boolean(settings.hasResellerPw ?? settings.resellerPw),
+    hasResellerApiKey: Boolean(settings.hasResellerApiKey ?? settings.resellerApiKey),
+    clearResellerPw: false,
+    clearResellerApiKey: false,
+  };
+}
+
+function resolveSecretField(incoming, existing, clear) {
+  if (clear) return '';
+  const next = incoming == null ? '' : String(incoming).trim();
+  if (next) return next;
+  // 빈 값 + clear 아님 → 기존 유지 (폼에서 비밀란을 비워 두는 경우)
+  return existing || '';
 }
 
 export const facilityKakaoSettingsRepository = {
@@ -33,20 +59,23 @@ export const facilityKakaoSettingsRepository = {
 
   async upsert(facilityId, data = {}) {
     const existing = await this.findByFacilityId(facilityId);
-    // 수정 시 PW/인증키 빈 값이면 기존 비밀값 유지
-    const pwPlain =
-      data.resellerPw != null && String(data.resellerPw).trim() !== ''
-        ? String(data.resellerPw)
-        : existing?.resellerPw || '';
-    const keyPlain =
-      data.resellerApiKey != null && String(data.resellerApiKey).trim() !== ''
-        ? String(data.resellerApiKey)
-        : existing?.resellerApiKey || '';
+    const clearPw = Boolean(data.clearResellerPw);
+    const clearKey = Boolean(data.clearResellerApiKey);
+    const pwPlain = resolveSecretField(
+      data.resellerPw,
+      existing?.resellerPw || '',
+      clearPw
+    );
+    const keyPlain = resolveSecretField(
+      data.resellerApiKey,
+      existing?.resellerApiKey || '',
+      clearKey
+    );
     const encPw = encryptSecret(pwPlain);
     const encKey = encryptSecret(keyPlain);
-    const apiUrl = String(
-      data.resellerApiUrl ?? existing?.resellerApiUrl ?? ''
-    ).trim() || 'https://api.bizppurio.com';
+    const apiUrl =
+      String(data.resellerApiUrl ?? existing?.resellerApiUrl ?? '').trim() ||
+      'https://api.bizppurio.com';
 
     const { rows } = await query(
       `INSERT INTO facility_kakao_alimtalk_settings (
@@ -84,12 +113,16 @@ export const facilityKakaoSettingsRepository = {
         encKey,
         data.senderPhone ?? existing?.senderPhone ?? '',
         data.senderProfile ?? existing?.senderProfile ?? '',
-        data.templateWaitingRegistered ?? existing?.templateWaitingRegistered ?? '',
+        data.templateWaitingRegistered ??
+          existing?.templateWaitingRegistered ??
+          '',
         data.templateEntryImminent ?? existing?.templateEntryImminent ?? '',
         data.templateEntryGuide ?? existing?.templateEntryGuide ?? '',
         data.templateNoShowCancelled ?? existing?.templateNoShowCancelled ?? '',
         data.templateOrderChanged ?? existing?.templateOrderChanged ?? '',
-        data.templateWaitingCancelled ?? existing?.templateWaitingCancelled ?? '',
+        data.templateWaitingCancelled ??
+          existing?.templateWaitingCancelled ??
+          '',
       ]
     );
     return mapRow(rows[0]);

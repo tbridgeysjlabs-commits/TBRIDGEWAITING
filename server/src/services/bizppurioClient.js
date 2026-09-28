@@ -68,8 +68,8 @@ const PPURIO_API_BASE = 'https://message.ppurio.com';
 
 /**
  * 발송 대상 API 후보.
- * - message.ppurio.com → 뿌리오(/v1/kakao)
- * - api.bizppurio.com / 문서 URL → 비즈뿌리오 우선, 인증 실패 시 뿌리오 폴백
+ * - message.ppurio.com 명시 → 뿌리오만
+ * - 그 외(문서 URL·비즈뿌리오 포함) → 비즈뿌리오 후 뿌리오 폴백
  */
 function resolveApiTargets(settings) {
   const raw = String(settings.resellerApiUrl || '').trim().toLowerCase();
@@ -81,13 +81,31 @@ function resolveApiTargets(settings) {
     return [{ provider: 'ppurio', base: PPURIO_API_BASE }];
   }
 
+  const isExplicitBizOnly =
+    /api\.bizppurio\.com|dev-api\.bizppurio\.com/.test(raw) &&
+    process.env.BIZPPURIO_NO_PPURIO_FALLBACK === '1';
+
   const bizBase = normalizeBaseUrl(settings.resellerApiUrl);
   const targets = [{ provider: 'bizppurio', base: bizBase }];
-  // 문서 URL·비즈뿌리오 기본값인 경우, 뿌리오 계정이면 폴백
-  if (bizBase === DEFAULT_BIZPPURIO_API_BASE || /github\.io|gitbook|bizppurio\.com/.test(raw)) {
+  if (!isExplicitBizOnly) {
     targets.push({ provider: 'ppurio', base: PPURIO_API_BASE });
   }
   return targets;
+}
+
+/** Basic 인증 후보 — 비즈: 암호 우선 / 뿌리오: 연동인증키 우선 */
+function authSecretCandidates(settings, provider = 'bizppurio') {
+  const pw = String(settings.resellerPw || '').trim();
+  const key = String(settings.resellerApiKey || '').trim();
+  const list = [];
+  if (provider === 'ppurio') {
+    if (key) list.push({ kind: 'apiKey', secret: key });
+    if (pw && pw !== key) list.push({ kind: 'pw', secret: pw });
+  } else {
+    if (pw) list.push({ kind: 'pw', secret: pw });
+    if (key && key !== pw) list.push({ kind: 'apiKey', secret: key });
+  }
+  return list;
 }
 
 /** @type {import('undici').ProxyAgent | null} */
@@ -283,21 +301,10 @@ function buildButtons(templateKey, changeWord = {}) {
 export function isBizppurioSettingsReady(settings) {
   if (!settings) return false;
   const account = String(settings.resellerId || '').trim();
-  // 비즈뿌리오 Basic = 계정:암호 (문서). API키는 보조.
   const secret = String(settings.resellerPw || settings.resellerApiKey || '').trim();
   const senderkey = String(settings.senderProfile || '').trim();
   const from = String(settings.senderPhone || '').replace(/\D/g, '');
   return Boolean(account && secret && senderkey && from.length >= 8);
-}
-
-/** Basic 인증에 쓸 비밀값 후보 (암호 우선, 다르면 API키도 시도) */
-function authSecretCandidates(settings) {
-  const pw = String(settings.resellerPw || '').trim();
-  const key = String(settings.resellerApiKey || '').trim();
-  const list = [];
-  if (pw) list.push({ kind: 'pw', secret: pw });
-  if (key && key !== pw) list.push({ kind: 'apiKey', secret: key });
-  return list;
 }
 
 async function requestToken(base, account, secret) {
@@ -318,9 +325,8 @@ async function requestToken(base, account, secret) {
 
 async function fetchAccessToken(settings) {
   const account = String(settings.resellerId || '').trim();
-  const candidates = authSecretCandidates(settings);
-  if (!account || !candidates.length) {
-    throw new Error('[bizppurio] 계정(ID) 또는 딜러사 PW/인증키가 없습니다.');
+  if (!account) {
+    throw new Error('[bizppurio] 계정(ID)가 없습니다.');
   }
 
   const targets = resolveApiTargets(settings);
@@ -328,8 +334,11 @@ async function fetchAccessToken(settings) {
   const tried = [];
 
   for (const target of targets) {
+    const candidates = authSecretCandidates(settings, target.provider);
+    if (!candidates.length) continue;
+
     for (const { kind, secret } of candidates) {
-      tried.push(`${target.provider}/${kind}`);
+      tried.push(`${target.provider}/${kind}@${target.base}`);
       const { tokenUrl, res, data } = await requestToken(target.base, account, secret);
       const token = data.accesstoken || data.token || data.access_token;
       const type = data.type || 'Bearer';
@@ -342,7 +351,7 @@ async function fetchAccessToken(settings) {
           base: target.base,
         };
         tokenCacheByAccount.set(account, entry);
-        console.log('[bizppurio] token ok', {
+        console.log('[facility-kakao] token ok', {
           url: tokenUrl,
           account,
           provider: target.provider,
@@ -353,19 +362,24 @@ async function fetchAccessToken(settings) {
       }
       last = { tokenUrl, res, data, kind, provider: target.provider };
       const code = String(data.code ?? '');
-      // 인증 실패면 다음 secret / 다음 provider 시도
-      if (code === '3007' || code === '3004' || code === '3001' || res.status === 401) {
-        console.warn('[bizppurio] auth failed', {
-          provider: target.provider,
-          auth: kind,
-          code,
-          desc: data.description || data.message,
-        });
+      console.warn('[facility-kakao] auth failed', {
+        provider: target.provider,
+        base: target.base,
+        auth: kind,
+        http: res.status,
+        code,
+        desc: data.description || data.message,
+      });
+      // 인증 실패면 다음 secret / provider 계속
+      if (code === '3007' || code === '3004' || code === '3001' || res.status === 401 || res.status === 400) {
         continue;
       }
-      // 그 외 오류는 해당 provider에서 중단하고 다음 provider
-      break;
+      continue;
     }
+  }
+
+  if (!tried.length) {
+    throw new Error('[bizppurio] 딜러사 PW 또는 API 인증키가 없습니다.');
   }
 
   const data = last?.data || {};
@@ -373,7 +387,7 @@ async function fetchAccessToken(settings) {
     data.description ||
     data.message ||
     `token HTTP ${last?.res?.status || '?'}`;
-  console.error('[bizppurio] token failed', {
+  console.error('[facility-kakao] token failed', {
     url: last?.tokenUrl,
     http: last?.res?.status,
     code: data.code,
@@ -381,11 +395,9 @@ async function fetchAccessToken(settings) {
     account,
     authTried: tried,
   });
-  const hint =
-    String(data.code) === '3007'
-      ? ' — «딜러사 PW»에 비즈뿌리오 로그인 암호를 넣거나, 뿌리오 연동이면 API 링크를 https://message.ppurio.com 으로 저장하세요.'
-      : '';
-  throw new Error(`[bizppurio] 토큰 발급 실패: ${msg}${hint}`);
+  throw new Error(
+    `[facility-kakao] 토큰 발급 실패: ${msg} — 비즈뿌리오면 로그인 암호(딜러사 PW), 뿌리오면 연동인증키(API 인증키)+API링크 https://message.ppurio.com 을 확인하세요. (시도: ${tried.join(', ')})`
+  );
 }
 
 async function getAccessToken(settings) {

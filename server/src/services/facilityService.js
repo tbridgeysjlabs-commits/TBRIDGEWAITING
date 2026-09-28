@@ -1,6 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { facilityRepository } from '../repositories/facilityRepository.js';
-import { facilityKakaoSettingsRepository } from '../repositories/facilityKakaoSettingsRepository.js';
+import {
+  facilityKakaoSettingsRepository,
+  maskKakaoSettingsSecrets,
+} from '../repositories/facilityKakaoSettingsRepository.js';
 import { waitingTypeRepository } from '../repositories/waitingTypeRepository.js';
 import { waitingRepository } from '../repositories/waitingRepository.js';
 import { billingRepository } from '../repositories/billingRepository.js';
@@ -55,6 +58,10 @@ function emptyKakaoSettings() {
     resellerId: '',
     resellerPw: '',
     resellerApiKey: '',
+    hasResellerPw: false,
+    hasResellerApiKey: false,
+    clearResellerPw: false,
+    clearResellerApiKey: false,
     senderPhone: '',
     senderProfile: '',
     templateWaitingRegistered: '',
@@ -84,6 +91,8 @@ function normalizeKakaoSettingsInput(input = {}) {
     resellerId: s(input.resellerId),
     resellerPw: s(input.resellerPw),
     resellerApiKey: s(input.resellerApiKey),
+    clearResellerPw: Boolean(input.clearResellerPw),
+    clearResellerApiKey: Boolean(input.clearResellerApiKey),
     senderPhone: s(input.senderPhone),
     senderProfile: s(input.senderProfile),
     templateWaitingRegistered: s(input.templateWaitingRegistered),
@@ -368,8 +377,10 @@ export const facilityService = {
     const result = toSystemFacility(created);
     if (kakaoAccountType === 'facility') {
       result.kakaoAlimtalkSettings =
-        (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
-        emptyKakaoSettings();
+        maskKakaoSettingsSecrets(
+          (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
+            emptyKakaoSettings()
+        ) || emptyKakaoSettings();
     }
     return result;
   },
@@ -531,8 +542,10 @@ export const facilityService = {
     const result = toSystemFacility(updated);
     if (result.kakaoAccountType === 'facility') {
       result.kakaoAlimtalkSettings =
-        (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
-        emptyKakaoSettings();
+        maskKakaoSettingsSecrets(
+          (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
+            emptyKakaoSettings()
+        ) || emptyKakaoSettings();
     }
     return result;
   },
@@ -540,19 +553,20 @@ export const facilityService = {
   async getKakaoAlimtalkSettings(facilityCode) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
-    return (
+    const settings =
       (await facilityKakaoSettingsRepository.findByFacilityId(facility.id)) ||
-      emptyKakaoSettings()
-    );
+      emptyKakaoSettings();
+    return maskKakaoSettingsSecrets(settings) || emptyKakaoSettings();
   },
 
   async saveKakaoAlimtalkSettings(facilityCode, input) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
-    return facilityKakaoSettingsRepository.upsert(
+    const saved = await facilityKakaoSettingsRepository.upsert(
       facility.id,
       normalizeKakaoSettingsInput(input)
     );
+    return maskKakaoSettingsSecrets(saved) || emptyKakaoSettings();
   },
 
   async listWaitingTypes(facilityCode) {
