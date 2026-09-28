@@ -336,29 +336,43 @@ export default function FacilitiesPage() {
   };
 
   const saveKakaoSettingsDraft = () => {
-    setForm((prev) => ({
-      ...prev,
-      kakaoAlimtalkSettings: {
-        ...emptyKakaoSettings(),
-        ...(prev.kakaoAlimtalkSettings || {}),
-        ...kakaoSettingsDraft,
-        // 삭제 예약 시 has 플래그도 즉시 반영(미리보기)
-        hasResellerPw: kakaoSettingsDraft.clearResellerPw
-          ? false
-          : Boolean(
-              kakaoSettingsDraft.resellerPw ||
-                prev.kakaoAlimtalkSettings?.hasResellerPw
-            ),
-        hasResellerApiKey: kakaoSettingsDraft.clearResellerApiKey
-          ? false
-          : Boolean(
-              kakaoSettingsDraft.resellerApiKey ||
-                prev.kakaoAlimtalkSettings?.hasResellerApiKey
-            ),
-      },
-    }));
+    setForm((prev) => {
+      const prevSettings = prev.kakaoAlimtalkSettings || emptyKakaoSettings();
+      const draft = kakaoSettingsDraft || emptyKakaoSettings();
+
+      // 비밀란이 비어 있고 «삭제»가 아니면 기존 입력/저장값을 유지 (화면에는 안 보여도 됨)
+      const resellerPw = draft.clearResellerPw
+        ? ''
+        : String(draft.resellerPw || '').trim() || prevSettings.resellerPw || '';
+      const resellerApiKey = draft.clearResellerApiKey
+        ? ''
+        : String(draft.resellerApiKey || '').trim() ||
+          prevSettings.resellerApiKey ||
+          '';
+
+      return {
+        ...prev,
+        kakaoAlimtalkSettings: {
+          ...emptyKakaoSettings(),
+          ...prevSettings,
+          ...draft,
+          resellerPw,
+          resellerApiKey,
+          clearResellerPw: Boolean(draft.clearResellerPw),
+          clearResellerApiKey: Boolean(draft.clearResellerApiKey),
+          hasResellerPw: draft.clearResellerPw
+            ? false
+            : Boolean(resellerPw || prevSettings.hasResellerPw),
+          hasResellerApiKey: draft.clearResellerApiKey
+            ? false
+            : Boolean(resellerApiKey || prevSettings.hasResellerApiKey),
+        },
+      };
+    });
     setKakaoSettingsOpen(false);
-    showToast('시설사 계정 설정이 임시 저장되었습니다. 등록/수정으로 반영하세요.');
+    showToast(
+      '설정이 임시 저장되었습니다. PW는 보안상 다시 보이지 않습니다. 시설사 «수정»으로 최종 반영하세요.'
+    );
   };
 
   const submit = async (e) => {
@@ -765,8 +779,9 @@ export default function FacilitiesPage() {
               </button>
               <h2>시설사 계정 카카오 알림톡</h2>
               <p className="muted" style={{ marginTop: 0, marginBottom: 12, fontSize: 13 }}>
-                PW·API 인증키는 보안상 다시 표시되지 않습니다. 변경할 때만 입력하고,
-                저장된 값을 지우려면 «삭제»를 누른 뒤 시설사 수정으로 반영하세요.
+                PW·API 인증키는 보안상 <strong>저장 후에도 칸이 비어 보입니다</strong>.
+                옆에 «(저장됨)»이 있으면 값이 유지된 상태입니다. 지울 때만 «삭제»를 누르세요.
+                최종 반영은 이 창 저장 후 시설사 «수정»이 필요합니다.
               </p>
               {KAKAO_SETTINGS_FIELDS.map((field) => (
                 <label key={field.key}>

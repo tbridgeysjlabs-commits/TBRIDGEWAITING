@@ -332,8 +332,16 @@ async function fetchAccessToken(settings) {
   const targets = resolveApiTargets(settings);
   let last = null;
   const tried = [];
+  /** @type {{ provider: string, code: string, desc: string }[]} */
+  const failures = [];
+  let bizppurioPasswordWrong = false;
 
   for (const target of targets) {
+    // 비즈뿌리오에서 계정은 있는데 암호만 틀린 경우(3007) → 뿌리오 폴백 불필요
+    if (target.provider === 'ppurio' && bizppurioPasswordWrong) {
+      continue;
+    }
+
     const candidates = authSecretCandidates(settings, target.provider);
     if (!candidates.length) continue;
 
@@ -360,21 +368,21 @@ async function fetchAccessToken(settings) {
         });
         return entry;
       }
-      last = { tokenUrl, res, data, kind, provider: target.provider };
       const code = String(data.code ?? '');
+      const desc = data.description || data.message || `HTTP ${res.status}`;
+      last = { tokenUrl, res, data, kind, provider: target.provider, code, desc };
+      failures.push({ provider: target.provider, code, desc, auth: kind });
       console.warn('[facility-kakao] auth failed', {
         provider: target.provider,
         base: target.base,
         auth: kind,
         http: res.status,
         code,
-        desc: data.description || data.message,
+        desc,
       });
-      // 인증 실패면 다음 secret / provider 계속
-      if (code === '3007' || code === '3004' || code === '3001' || res.status === 401 || res.status === 400) {
-        continue;
+      if (target.provider === 'bizppurio' && code === '3007') {
+        bizppurioPasswordWrong = true;
       }
-      continue;
     }
   }
 
@@ -382,21 +390,31 @@ async function fetchAccessToken(settings) {
     throw new Error('[bizppurio] 딜러사 PW 또는 API 인증키가 없습니다.');
   }
 
-  const data = last?.data || {};
-  const msg =
-    data.description ||
-    data.message ||
-    `token HTTP ${last?.res?.status || '?'}`;
   console.error('[facility-kakao] token failed', {
     url: last?.tokenUrl,
-    http: last?.res?.status,
-    code: data.code,
-    description: msg,
     account,
     authTried: tried,
+    failures,
   });
+
+  if (bizppurioPasswordWrong) {
+    throw new Error(
+      `[facility-kakao] 비즈뿌리오 계정(${account})은 있으나 암호가 틀립니다(3007). ` +
+        `비즈뿌리오 사이트에서 로그인되는 «딜러사 PW»를 다시 저장하세요. API 인증키·발신프로필 Key를 암호란에 넣지 마세요.`
+    );
+  }
+
+  const bizFail = failures.find((f) => f.provider === 'bizppurio');
+  const ppurioFail = failures.find((f) => f.provider === 'ppurio');
+  if (bizFail?.code === '3004' && ppurioFail?.code === '3004') {
+    throw new Error(
+      `[facility-kakao] 계정(${account})을 비즈뿌리오·뿌리오 모두에서 찾지 못했습니다(3004). 딜러사 ID를 확인하세요.`
+    );
+  }
+
+  const msg = last?.desc || '토큰 발급 실패';
   throw new Error(
-    `[facility-kakao] 토큰 발급 실패: ${msg} — 비즈뿌리오면 로그인 암호(딜러사 PW), 뿌리오면 연동인증키(API 인증키)+API링크 https://message.ppurio.com 을 확인하세요. (시도: ${tried.join(', ')})`
+    `[facility-kakao] 토큰 발급 실패: ${msg} (시도: ${tried.join(', ')})`
   );
 }
 
