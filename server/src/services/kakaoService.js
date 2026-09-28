@@ -13,6 +13,10 @@ import {
   templateDisplayName,
 } from './ppurioTemplates.js';
 import { facilityKakaoSettingsRepository } from '../repositories/facilityKakaoSettingsRepository.js';
+import {
+  isBizppurioSettingsReady,
+  sendBizppurioAlimtalk,
+} from './bizppurioClient.js';
 
 /** @typedef {'MOCK'|'INSUFFICIENT_BALANCE'|'API_ERROR'|'EXCEPTION'|'SUCCESS'} KakaoSendReason */
 
@@ -294,9 +298,9 @@ export const kakaoService = {
   },
 
   /**
-   * 시설사 자체 중계사 계정 발송.
-   * TODO: 실제 딜러사 API 문서 확보 후 resellerApiUrl + 인증정보로 연동 구현.
-   * 현재는 설정/분기 골격만 — 티브리지 뿌리오·잔액 차감은 사용하지 않음.
+   * 시설사 자체 중계사(비즈뿌리오) 계정 발송.
+   * 티브리지 뿌리오·잔액 차감은 사용하지 않는다.
+   * 문서: https://bizppurio.github.io/
    */
   async dispatchFacilityAccountTemplate({
     facility,
@@ -318,6 +322,17 @@ export const kakaoService = {
       });
     }
 
+    if (!isBizppurioSettingsReady(settings)) {
+      return withReason({
+        ok: false,
+        reason: 'API_ERROR',
+        detail: 'INCOMPLETE_FACILITY_BIZPPURIO_SETTINGS',
+        code: 'INCOMPLETE_SETTINGS',
+        message:
+          '시설사 비즈뿌리오 설정이 불완전합니다. (딜러사 ID, PW/인증키, 발신번호, 발신 프로필)',
+      });
+    }
+
     const ctx = buildCtx(facility, waiting, extraCtx);
     const changeWord = buildChangeWord(templateKey, ctx);
     const refKey = `wf_${String(waiting.id || '').replace(/-/g, '').slice(0, 22)}`;
@@ -329,55 +344,93 @@ export const kakaoService = {
       changeWord,
       refKey,
       accountType: 'facility',
+      provider: 'bizppurio',
       resellerName: settings?.resellerName || '',
       resellerApiUrl: settings?.resellerApiUrl || '',
       senderProfile: settings?.senderProfile || '',
-      // TODO: 딜러사 API 호출 구현 시 live=true + 실제 응답 기록
-      live: false,
-      todo: 'FACILITY_RESELLER_API_PENDING',
+      live: true,
     };
 
-    console.log(
-      '[Kakao Alimtalk FACILITY] 시설사 계정 발송 골격 — 실제 딜러사 API 미연동',
-      {
-        facilityCode: facility.facility_code,
-        templateKey,
+    let sendResult;
+    try {
+      sendResult = await sendBizppurioAlimtalk({
+        settings,
+        to: waiting.phone,
         templateCode,
-        reseller: settings?.resellerName,
-        apiUrl: settings?.resellerApiUrl,
-      }
-    );
+        templateKey,
+        changeWord,
+        refKey,
+      });
+      payload.bizppurio = {
+        ok: sendResult.ok,
+        code: sendResult.code,
+        messagekey: sendResult.messagekey,
+        error: sendResult.message,
+      };
+    } catch (err) {
+      const detail = String(err?.message || err);
+      console.error('[bizppurio] facility send exception', detail);
+      sendResult = {
+        ok: false,
+        exception: true,
+        code: 'BIZPPURIO_ERROR',
+        message: detail,
+      };
+      payload.bizppurio = sendResult;
+    }
 
-    // TODO: callFacilityResellerAlimtalk({ settings, to, templateCode, changeWord, refKey })
-    // 문서 확보 전까지 성공 로그+이력만 남기고 잔액 미차감
     const sentAt = new Date();
-    payload.mockNote =
-      '시설사 계정 모드: 딜러사 API 연동 대기(설정값만 사용, 실제 미발송)';
+    if (!sendResult.ok) {
+      await query(
+        `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
+         VALUES ($1, $2, 'kakao', $3, 'failed')`,
+        [facility.id, waiting.id, JSON.stringify(payload)]
+      );
+      await billingRepository
+        .logFailedSend(facility.id, waiting.id, 0, {
+          templateName: `${templateName} (시설사계정)`,
+          recipientPhone: waiting.phone,
+          note: sendResult.message || '비즈뿌리오 발송 실패',
+          sendPayload: payload,
+        })
+        .catch(() => null);
+      return withReason({
+        ok: false,
+        reason: sendResult.exception ? 'EXCEPTION' : 'API_ERROR',
+        detail: sendResult.message,
+        code: sendResult.code || 'SEND_FAILED',
+        message: sendResult.message || '시설사 계정 알림톡 발송에 실패했습니다.',
+        payload,
+        balance: Number(facility.kakao_balance || 0),
+        unitCost: 0,
+      });
+    }
+
     await query(
       `INSERT INTO notification_logs (facility_id, waiting_id, channel, payload, status)
        VALUES ($1, $2, 'kakao', $3, 'sent')`,
       [facility.id, waiting.id, JSON.stringify(payload)]
     );
     await waitingRepository.setKakaoSentAt(waiting.id, sentAt);
-    // 시설사 계정은 티브리지 잔액 차감 없음 — 이력만 0원 기록
-    await billingRepository.deductForSend(facility.id, waiting.id, 0, {
-      templateName: `${templateName} (시설사계정)`,
-      recipientPhone: waiting.phone,
-      sendStatus: 'success',
-      sendPayload: payload,
-      note: '시설사 자체 계정 발송(딜러사 API 연동 대기)',
-    }).catch(() => null);
+    await billingRepository
+      .deductForSend(facility.id, waiting.id, 0, {
+        templateName: `${templateName} (시설사계정)`,
+        recipientPhone: waiting.phone,
+        sendStatus: 'success',
+        sendPayload: payload,
+        note: '시설사 비즈뿌리오 계정 발송',
+      })
+      .catch(() => null);
 
     return withReason({
       ok: true,
-      reason: 'MOCK',
-      mock: true,
-      detail: 'FACILITY_RESELLER_API_PENDING',
-      message: '시설사 계정 설정으로 분기됨(딜러사 API 연동 대기)',
+      reason: 'SUCCESS',
+      mock: false,
       payload,
       sentAt,
       balance: Number(facility.kakao_balance || 0),
       unitCost: 0,
+      messagekey: sendResult.messagekey,
     });
   },
 

@@ -8,6 +8,7 @@ import { paymentRepository } from '../repositories/paymentRepository.js';
 import { noticeRepository } from '../repositories/noticeRepository.js';
 import { nicepayService } from './nicepayService.js';
 import { isPpurioConfigured } from './ppurioClient.js';
+import { isBizppurioSettingsReady } from './bizppurioClient.js';
 import { createError } from '../middleware/errorHandler.js';
 import { validatePassword } from '../utils/passwordPolicy.js';
 import {
@@ -50,7 +51,7 @@ function requireStrongPassword(password, username) {
 function emptyKakaoSettings() {
   return {
     resellerName: '',
-    resellerApiUrl: '',
+    resellerApiUrl: 'https://api.bizppurio.com',
     resellerId: '',
     resellerPw: '',
     resellerApiKey: '',
@@ -67,9 +68,10 @@ function emptyKakaoSettings() {
 
 function normalizeKakaoSettingsInput(input = {}) {
   const s = (v) => (v == null ? '' : String(v).trim());
+  const apiUrl = s(input.resellerApiUrl) || 'https://api.bizppurio.com';
   return {
     resellerName: s(input.resellerName),
-    resellerApiUrl: s(input.resellerApiUrl),
+    resellerApiUrl: apiUrl,
     resellerId: s(input.resellerId),
     resellerPw: s(input.resellerPw),
     resellerApiKey: s(input.resellerApiKey),
@@ -602,29 +604,38 @@ export const facilityService = {
   async getBilling(facilityCode) {
     const facility = await facilityRepository.findByCode(facilityCode);
     if (!facility) throw createError(404, '시설사를 찾을 수 없습니다.');
+    const isFacilityAccount = facility.kakao_account_type === 'facility';
+    let facilityBizReady = false;
+    if (isFacilityAccount) {
+      const settings = await facilityKakaoSettingsRepository.findByFacilityId(
+        facility.id
+      );
+      facilityBizReady = isBizppurioSettingsReady(settings);
+    }
     return {
       balance: Number(facility.kakao_balance || 0),
       unitCost: Number(facility.kakao_unit_cost || 20),
       warningThreshold: Number(facility.kakao_warning_threshold || 1000),
-      kakaoAccountType:
-        facility.kakao_account_type === 'facility' ? 'facility' : 'tbridge',
-      billingEnabled: facility.kakao_account_type !== 'facility',
+      kakaoAccountType: isFacilityAccount ? 'facility' : 'tbridge',
+      billingEnabled: !isFacilityAccount,
       lowBalanceWarning:
-        facility.kakao_account_type !== 'facility' &&
+        !isFacilityAccount &&
         Number(facility.kakao_balance || 0) > 0 &&
         Number(facility.kakao_balance || 0) <=
           Number(facility.kakao_warning_threshold || 1000),
       insufficientBalance:
-        facility.kakao_account_type !== 'facility' &&
+        !isFacilityAccount &&
         Number(facility.kakao_balance || 0) < Number(facility.kakao_unit_cost || 20),
-      kakaoAlimtalkMode:
-        facility.kakao_account_type === 'facility'
+      kakaoAlimtalkMode: isFacilityAccount
+        ? facilityBizReady
           ? 'facility'
-          : isPpurioConfigured()
-            ? 'live'
-            : 'mock',
-      kakaoAlimtalkLive:
-        facility.kakao_account_type === 'facility' ? true : isPpurioConfigured(),
+          : 'facility_incomplete'
+        : isPpurioConfigured()
+          ? 'live'
+          : 'mock',
+      kakaoAlimtalkLive: isFacilityAccount
+        ? facilityBizReady
+        : isPpurioConfigured(),
       paymentPgMode: nicepayService.getPublicConfig().mode,
       nicepayConfigured: nicepayService.isConfigured(),
       nicepayAllowMock: nicepayService.isMockAllowed(),

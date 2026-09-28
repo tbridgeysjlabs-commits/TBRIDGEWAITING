@@ -32,8 +32,22 @@ export const facilityKakaoSettingsRepository = {
   },
 
   async upsert(facilityId, data = {}) {
-    const encPw = encryptSecret(data.resellerPw ?? '');
-    const encKey = encryptSecret(data.resellerApiKey ?? '');
+    const existing = await this.findByFacilityId(facilityId);
+    // 수정 시 PW/인증키 빈 값이면 기존 비밀값 유지
+    const pwPlain =
+      data.resellerPw != null && String(data.resellerPw).trim() !== ''
+        ? String(data.resellerPw)
+        : existing?.resellerPw || '';
+    const keyPlain =
+      data.resellerApiKey != null && String(data.resellerApiKey).trim() !== ''
+        ? String(data.resellerApiKey)
+        : existing?.resellerApiKey || '';
+    const encPw = encryptSecret(pwPlain);
+    const encKey = encryptSecret(keyPlain);
+    const apiUrl = String(
+      data.resellerApiUrl ?? existing?.resellerApiUrl ?? ''
+    ).trim() || 'https://api.bizppurio.com';
+
     const { rows } = await query(
       `INSERT INTO facility_kakao_alimtalk_settings (
          facility_id,
@@ -63,19 +77,19 @@ export const facilityKakaoSettingsRepository = {
        RETURNING *`,
       [
         facilityId,
-        data.resellerName ?? '',
-        data.resellerApiUrl ?? '',
-        data.resellerId ?? '',
+        data.resellerName ?? existing?.resellerName ?? '',
+        apiUrl,
+        data.resellerId ?? existing?.resellerId ?? '',
         encPw,
         encKey,
-        data.senderPhone ?? '',
-        data.senderProfile ?? '',
-        data.templateWaitingRegistered ?? '',
-        data.templateEntryImminent ?? '',
-        data.templateEntryGuide ?? '',
-        data.templateNoShowCancelled ?? '',
-        data.templateOrderChanged ?? '',
-        data.templateWaitingCancelled ?? '',
+        data.senderPhone ?? existing?.senderPhone ?? '',
+        data.senderProfile ?? existing?.senderProfile ?? '',
+        data.templateWaitingRegistered ?? existing?.templateWaitingRegistered ?? '',
+        data.templateEntryImminent ?? existing?.templateEntryImminent ?? '',
+        data.templateEntryGuide ?? existing?.templateEntryGuide ?? '',
+        data.templateNoShowCancelled ?? existing?.templateNoShowCancelled ?? '',
+        data.templateOrderChanged ?? existing?.templateOrderChanged ?? '',
+        data.templateWaitingCancelled ?? existing?.templateWaitingCancelled ?? '',
       ]
     );
     return mapRow(rows[0]);

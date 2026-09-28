@@ -46,7 +46,7 @@ const DEFAULT_MASTER_PASSWORD = 'tbridge1234!';
 
 const emptyKakaoSettings = () => ({
   resellerName: '',
-  resellerApiUrl: '',
+  resellerApiUrl: 'https://api.bizppurio.com',
   resellerId: '',
   resellerPw: '',
   resellerApiKey: '',
@@ -93,7 +93,7 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerApiUrl',
     label: '카카오 알림톡 중계사 API 링크',
-    placeholder: '카카오 알림톡 중계사 API 링크 입력',
+    placeholder: 'https://api.bizppurio.com',
   },
   {
     key: 'resellerId',
