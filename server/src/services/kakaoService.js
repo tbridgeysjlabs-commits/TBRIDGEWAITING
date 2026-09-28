@@ -365,8 +365,10 @@ export const kakaoService = {
         ok: sendResult.ok,
         code: sendResult.code,
         messagekey: sendResult.messagekey,
+        provider: sendResult.provider,
         error: sendResult.message,
       };
+      if (sendResult.provider) payload.provider = sendResult.provider;
     } catch (err) {
       const detail = String(err?.message || err);
       console.error('[bizppurio] facility send exception', detail);

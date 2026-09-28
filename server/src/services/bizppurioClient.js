@@ -61,8 +61,34 @@ function normalizeBaseUrl(raw) {
   return base.replace(/\/$/, '') || DEFAULT_BIZPPURIO_API_BASE;
 }
 
-/** account → { token, type, expiresAt } */
+/** account → { token, type, expiresAt, provider, base } */
 const tokenCacheByAccount = new Map();
+
+const PPURIO_API_BASE = 'https://message.ppurio.com';
+
+/**
+ * 발송 대상 API 후보.
+ * - message.ppurio.com → 뿌리오(/v1/kakao)
+ * - api.bizppurio.com / 문서 URL → 비즈뿌리오 우선, 인증 실패 시 뿌리오 폴백
+ */
+function resolveApiTargets(settings) {
+  const raw = String(settings.resellerApiUrl || '').trim().toLowerCase();
+  const isExplicitPpurio =
+    /message\.ppurio\.com/.test(raw) ||
+    (/\bppurio\.com\b/.test(raw) && !/bizppurio/.test(raw) && !/github\.io/.test(raw));
+
+  if (isExplicitPpurio) {
+    return [{ provider: 'ppurio', base: PPURIO_API_BASE }];
+  }
+
+  const bizBase = normalizeBaseUrl(settings.resellerApiUrl);
+  const targets = [{ provider: 'bizppurio', base: bizBase }];
+  // 문서 URL·비즈뿌리오 기본값인 경우, 뿌리오 계정이면 폴백
+  if (bizBase === DEFAULT_BIZPPURIO_API_BASE || /github\.io|gitbook|bizppurio\.com/.test(raw)) {
+    targets.push({ provider: 'ppurio', base: PPURIO_API_BASE });
+  }
+  return targets;
+}
 
 /** @type {import('undici').ProxyAgent | null} */
 let proxyAgent = null;
@@ -291,41 +317,55 @@ async function requestToken(base, account, secret) {
 }
 
 async function fetchAccessToken(settings) {
-  const base = normalizeBaseUrl(settings.resellerApiUrl);
   const account = String(settings.resellerId || '').trim();
   const candidates = authSecretCandidates(settings);
   if (!account || !candidates.length) {
     throw new Error('[bizppurio] 계정(ID) 또는 딜러사 PW/인증키가 없습니다.');
   }
 
+  const targets = resolveApiTargets(settings);
   let last = null;
-  for (const { kind, secret } of candidates) {
-    const { tokenUrl, res, data } = await requestToken(base, account, secret);
-    const token = data.accesstoken || data.token || data.access_token;
-    const type = data.type || 'Bearer';
-    if (res.ok && token) {
-      const entry = {
-        token,
-        type,
-        expiresAt: parseExpired(data.expired),
-      };
-      tokenCacheByAccount.set(account, entry);
-      console.log('[bizppurio] token ok', {
-        url: tokenUrl,
-        account,
-        auth: kind,
-        expired: data.expired,
-      });
-      return entry;
+  const tried = [];
+
+  for (const target of targets) {
+    for (const { kind, secret } of candidates) {
+      tried.push(`${target.provider}/${kind}`);
+      const { tokenUrl, res, data } = await requestToken(target.base, account, secret);
+      const token = data.accesstoken || data.token || data.access_token;
+      const type = data.type || 'Bearer';
+      if (res.ok && token) {
+        const entry = {
+          token,
+          type,
+          expiresAt: parseExpired(data.expired),
+          provider: target.provider,
+          base: target.base,
+        };
+        tokenCacheByAccount.set(account, entry);
+        console.log('[bizppurio] token ok', {
+          url: tokenUrl,
+          account,
+          provider: target.provider,
+          auth: kind,
+          expired: data.expired,
+        });
+        return entry;
+      }
+      last = { tokenUrl, res, data, kind, provider: target.provider };
+      const code = String(data.code ?? '');
+      // 인증 실패면 다음 secret / 다음 provider 시도
+      if (code === '3007' || code === '3004' || code === '3001' || res.status === 401) {
+        console.warn('[bizppurio] auth failed', {
+          provider: target.provider,
+          auth: kind,
+          code,
+          desc: data.description || data.message,
+        });
+        continue;
+      }
+      // 그 외 오류는 해당 provider에서 중단하고 다음 provider
+      break;
     }
-    last = { tokenUrl, res, data, kind };
-    const code = String(data.code ?? '');
-    // 암호 오류(3007)이고 다른 후보가 있으면 다음 시도
-    if (code === '3007' && candidates.length > 1) {
-      console.warn('[bizppurio] token 3007 with', kind, '— trying next secret');
-      continue;
-    }
-    break;
   }
 
   const data = last?.data || {};
@@ -339,11 +379,11 @@ async function fetchAccessToken(settings) {
     code: data.code,
     description: msg,
     account,
-    authTried: candidates.map((c) => c.kind),
+    authTried: tried,
   });
   const hint =
     String(data.code) === '3007'
-      ? ' (비즈뿌리오 계정 암호를 «딜러사 PW»에 넣어 주세요. API 인증키와 다를 수 있습니다.)'
+      ? ' — «딜러사 PW»에 비즈뿌리오 로그인 암호를 넣거나, 뿌리오 연동이면 API 링크를 https://message.ppurio.com 으로 저장하세요.'
       : '';
   throw new Error(`[bizppurio] 토큰 발급 실패: ${msg}${hint}`);
 }
@@ -358,15 +398,165 @@ async function getAccessToken(settings) {
   return fetchAccessToken(settings);
 }
 
+async function sendViaBizppurio({
+  auth,
+  account,
+  from,
+  toDigits,
+  senderkey,
+  templateCode,
+  templateKey,
+  changeWord,
+  refKey,
+  message,
+}) {
+  const msg = message || buildBizppurioMessage(templateKey, changeWord);
+  const button =
+    process.env.BIZPPURIO_INCLUDE_BUTTONS === '0'
+      ? undefined
+      : buildButtons(templateKey, changeWord);
+  const body = {
+    account,
+    refkey: String(refKey || `tb_${Date.now()}`).slice(0, 32),
+    type: 'at',
+    from,
+    to: toDigits,
+    content: {
+      at: {
+        senderkey,
+        templatecode: String(templateCode).trim(),
+        message: msg,
+        ...(button?.length ? { button } : {}),
+      },
+    },
+  };
+
+  const res = await httpFetch(`${auth.base}/v3/message`, {
+    method: 'POST',
+    headers: {
+      Authorization: `${auth.type} ${auth.token}`,
+      'Content-Type': 'application/json; charset=utf-8',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  const code = String(data.code ?? data.resultcode ?? '');
+  const ok = code === '1000' || code === '0';
+  if (!ok) {
+    console.error('[bizppurio] at send failed', {
+      http: res.status,
+      code,
+      description: data.description || data.message,
+      templateCode,
+      to: toDigits,
+      account,
+    });
+    return {
+      ok: false,
+      provider: 'bizppurio',
+      code: code || `HTTP_${res.status}`,
+      message:
+        data.description ||
+        data.message ||
+        `비즈뿌리오 알림톡 발송 실패 (code=${code || res.status})`,
+      raw: data,
+      request: body,
+    };
+  }
+  console.log('[bizppurio] at accepted', {
+    code: code || '1000',
+    messagekey: data.messagekey || data.messageKey,
+    refkey: body.refkey,
+    templateCode,
+  });
+  return {
+    ok: true,
+    provider: 'bizppurio',
+    code: code || '1000',
+    messagekey: data.messagekey || data.messageKey,
+    raw: data,
+    request: body,
+  };
+}
+
+async function sendViaPpurio({
+  auth,
+  account,
+  toDigits,
+  senderProfile,
+  templateCode,
+  changeWord,
+  refKey,
+}) {
+  const cleanedChangeWord = {};
+  for (const [k, v] of Object.entries(changeWord || {})) {
+    if (v === undefined || v === null || v === '') continue;
+    cleanedChangeWord[k] = String(v);
+  }
+  const body = {
+    account,
+    messageType: 'ALT',
+    senderProfile,
+    templateCode: String(templateCode).trim(),
+    duplicateFlag: 'Y',
+    targetCount: 1,
+    targets: [{ to: toDigits, changeWord: cleanedChangeWord }],
+    refKey: String(refKey || `tb_${Date.now()}`).slice(0, 32),
+    isResend: 'N',
+  };
+
+  const res = await httpFetch(`${auth.base}/v1/kakao`, {
+    method: 'POST',
+    headers: {
+      Authorization: `${auth.type} ${auth.token}`,
+      'Content-Type': 'application/json; charset=utf-8',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  const code = String(data.code ?? data.resultcode ?? '');
+  const ok = code === '1000' || code === '0';
+  if (!ok) {
+    console.error('[ppurio/facility] kakao send failed', {
+      http: res.status,
+      code,
+      description: data.description || data.message,
+      templateCode,
+      to: toDigits,
+      account,
+    });
+    return {
+      ok: false,
+      provider: 'ppurio',
+      code: code || `HTTP_${res.status}`,
+      message:
+        data.description ||
+        data.message ||
+        `뿌리오 알림톡 발송 실패 (code=${code || res.status})`,
+      raw: data,
+      request: body,
+    };
+  }
+  console.log('[ppurio/facility] kakao accepted', {
+    code,
+    messagekey: data.messagekey || data.messageKey,
+    refKey: body.refKey,
+    templateCode,
+  });
+  return {
+    ok: true,
+    provider: 'ppurio',
+    code: code || '1000',
+    messagekey: data.messagekey || data.messageKey,
+    raw: data,
+    request: body,
+  };
+}
+
 /**
- * @param {object} opts
- * @param {object} opts.settings facility_kakao_alimtalk_settings (복호화된 값)
- * @param {string} opts.to 수신 번호
- * @param {string} opts.templateCode
- * @param {string} opts.templateKey REGISTERED 등
- * @param {Record<string,string>} opts.changeWord
- * @param {string} [opts.refKey]
- * @param {string} [opts.message] 미지정 시 buildBizppurioMessage 사용
+ * 시설사 중계사 알림톡 발송 (비즈뿌리오 AT 또는 뿌리오 ALT 자동 선택)
  */
 export async function sendBizppurioAlimtalk({
   settings,
@@ -390,83 +580,35 @@ export async function sendBizppurioAlimtalk({
     throw new Error('[bizppurio] templateCode 가 비어 있습니다.');
   }
 
-  const base = normalizeBaseUrl(settings.resellerApiUrl);
   const account = String(settings.resellerId).trim();
   const from = String(settings.senderPhone || '').replace(/\D/g, '');
   const senderkey = String(settings.senderProfile || '').trim();
-  const msg =
-    message ||
-    buildBizppurioMessage(templateKey, changeWord);
-  // 템플릿에 WL 버튼이 있으면 포함. BIZPPURIO_INCLUDE_BUTTONS=0 이면 강제 생략
-  const button =
-    process.env.BIZPPURIO_INCLUDE_BUTTONS === '0'
-      ? undefined
-      : buildButtons(templateKey, changeWord);
-  const body = {
-    account,
-    refkey: String(refKey || `tb_${Date.now()}`).slice(0, 32),
-    type: 'at',
-    from,
-    to: toDigits,
-    content: {
-      at: {
-        senderkey,
-        templatecode: String(templateCode).trim(),
-        message: msg,
-        ...(button?.length ? { button } : {}),
-      },
-    },
-  };
-
   const auth = await getAccessToken(settings);
-  const res = await httpFetch(`${base}/v3/message`, {
-    method: 'POST',
-    headers: {
-      Authorization: `${auth.type} ${auth.token}`,
-      'Content-Type': 'application/json; charset=utf-8',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  const code = String(data.code ?? data.resultcode ?? '');
-  const ok = code === '1000' || code === '0';
 
-  if (!ok) {
-    console.error('[bizppurio] at send failed', {
-      http: res.status,
-      code,
-      description: data.description || data.message,
-      templateCode,
-      to: toDigits,
+  if (auth.provider === 'ppurio') {
+    return sendViaPpurio({
+      auth,
       account,
+      toDigits,
+      senderProfile: senderkey,
+      templateCode,
+      changeWord,
+      refKey,
     });
-    return {
-      ok: false,
-      code: code || `HTTP_${res.status}`,
-      message:
-        data.description ||
-        data.message ||
-        `비즈뿌리오 알림톡 발송 실패 (code=${code || res.status})`,
-      raw: data,
-      request: body,
-    };
   }
 
-  console.log('[bizppurio] at accepted', {
-    code: code || '1000',
-    messagekey: data.messagekey || data.messageKey,
-    refkey: body.refkey,
+  return sendViaBizppurio({
+    auth,
+    account,
+    from,
+    toDigits,
+    senderkey,
     templateCode,
+    templateKey,
+    changeWord,
+    refKey,
+    message,
   });
-
-  return {
-    ok: true,
-    code: code || '1000',
-    messagekey: data.messagekey || data.messageKey,
-    raw: data,
-    request: body,
-  };
 }
 
 export function clearBizppurioTokenCache(account) {

@@ -93,7 +93,7 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerApiUrl',
     label: '카카오 알림톡 중계사 API 링크',
-    placeholder: 'https://api.bizppurio.com (문서 주소 아님)',
+    placeholder: '비즈뿌리오 https://api.bizppurio.com / 뿌리오 https://message.ppurio.com',
   },
   {
     key: 'resellerId',
@@ -103,12 +103,12 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerPw',
     label: '카카오 알림톡 중계사(딜러사) PW',
-    placeholder: '비즈뿌리오 로그인 암호 (계정:암호)',
+    placeholder: '비즈뿌리오: 로그인 암호 / 뿌리오: 비워도 됨',
   },
   {
     key: 'resellerApiKey',
     label: '카카오 알림톡 중계사 API 인증키',
-    placeholder: '없으면 비워두기 — 보통 딜러사 PW만 사용',
+    placeholder: '뿌리오: 연동인증키 / 비즈뿌리오: 없으면 비움',
   },
   { key: 'senderPhone', label: '발신번호', placeholder: '발신번호 입력' },
   {

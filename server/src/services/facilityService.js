@@ -68,7 +68,16 @@ function emptyKakaoSettings() {
 
 function normalizeKakaoSettingsInput(input = {}) {
   const s = (v) => (v == null ? '' : String(v).trim());
-  const apiUrl = s(input.resellerApiUrl) || 'https://api.bizppurio.com';
+  let apiUrl = s(input.resellerApiUrl);
+  // 문서/웹 주소를 API 호스트로 교정
+  if (
+    !apiUrl ||
+    /bizppurio\.github\.io|biztech\.gitbook\.io|(?:www\.)?bizppurio\.com/i.test(
+      apiUrl
+    )
+  ) {
+    apiUrl = 'https://api.bizppurio.com';
+  }
   return {
     resellerName: s(input.resellerName),
     resellerApiUrl: apiUrl,
