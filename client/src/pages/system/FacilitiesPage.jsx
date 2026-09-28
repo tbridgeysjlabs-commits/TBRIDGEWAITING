@@ -93,7 +93,7 @@ const KAKAO_SETTINGS_FIELDS = [
   {
     key: 'resellerApiUrl',
     label: '카카오 알림톡 중계사 API 링크',
-    placeholder: 'https://api.bizppurio.com',
+    placeholder: 'https://api.bizppurio.com (문서 주소 아님)',
   },
   {
     key: 'resellerId',

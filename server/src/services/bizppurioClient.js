@@ -14,6 +14,53 @@ import { TEMPLATE } from './ppurioTemplates.js';
 
 const DEFAULT_BIZPPURIO_API_BASE = 'https://api.bizppurio.com';
 
+/** 문서/콘솔 등 API가 아닌 호스트 → 운영 API로 치환 */
+const NON_API_HOST_RE =
+  /^(?:www\.)?(?:bizppurio\.github\.io|biztech\.gitbook\.io|bizppurio\.com|www\.bizppurio\.com)$/i;
+
+/**
+ * 시설사 설정에 문서 URL·엔드포인트 전체 경로가 들어와도
+ * https://api.bizppurio.com 형태로 정규화한다.
+ */
+function normalizeBaseUrl(raw) {
+  let url = String(raw || '').trim();
+  if (!url) return DEFAULT_BIZPPURIO_API_BASE;
+
+  // 스킴 없으면 https
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return DEFAULT_BIZPPURIO_API_BASE;
+  }
+
+  const host = parsed.hostname.replace(/^www\./i, '');
+  // 개발자 문서·웹 콘솔 URL은 API 호스트가 아님
+  if (
+    NON_API_HOST_RE.test(parsed.hostname) ||
+    host === 'bizppurio.github.io' ||
+    host === 'biztech.gitbook.io' ||
+    host === 'bizppurio.com'
+  ) {
+    console.warn(
+      `[bizppurio] API 링크가 문서/웹 주소입니다 (${parsed.origin}). ${DEFAULT_BIZPPURIO_API_BASE} 로 대체합니다.`
+    );
+    return DEFAULT_BIZPPURIO_API_BASE;
+  }
+
+  // 사용자가 .../v1/token 또는 .../v3/message 까지 붙여 넣은 경우 strip
+  let path = parsed.pathname.replace(/\/$/, '');
+  path = path.replace(/\/v[0-9]+\/(token|message|kakao)(?:\/.*)?$/i, '');
+  path = path.replace(/\/+$/, '');
+
+  const base = `${parsed.protocol}//${parsed.host}${path}`;
+  return base.replace(/\/$/, '') || DEFAULT_BIZPPURIO_API_BASE;
+}
+
 /** account → { token, type, expiresAt } */
 const tokenCacheByAccount = new Map();
 
@@ -44,12 +91,6 @@ async function httpFetch(url, options = {}) {
   const dispatcher = getProxyDispatcher();
   if (dispatcher) return undiciFetch(url, { ...options, dispatcher });
   return undiciFetch(url, options);
-}
-
-function normalizeBaseUrl(raw) {
-  const fallback = DEFAULT_BIZPPURIO_API_BASE;
-  const url = String(raw || '').trim() || fallback;
-  return url.replace(/\/$/, '');
 }
 
 function parseExpired(expired) {
@@ -230,21 +271,29 @@ async function fetchAccessToken(settings) {
     throw new Error('[bizppurio] 계정(ID) 또는 인증키/비밀번호가 없습니다.');
   }
 
+  const tokenUrl = `${base}/v1/token`;
   const basic = Buffer.from(`${account}:${secret}`, 'utf8').toString('base64');
-  const res = await httpFetch(`${base}/v1/token`, {
+  // 문서: Headers만 설정 (Body 없음). 빈 JSON body 도 허용되나 생략이 안전.
+  const res = await httpFetch(tokenUrl, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${basic}`,
       'Content-Type': 'application/json; charset=utf-8',
       Accept: 'application/json',
     },
-    body: '{}',
   });
   const data = await res.json().catch(() => ({}));
   const token = data.accesstoken || data.token || data.access_token;
   const type = data.type || 'Bearer';
   if (!res.ok || !token) {
     const msg = data.description || data.message || `token HTTP ${res.status}`;
+    console.error('[bizppurio] token failed', {
+      url: tokenUrl,
+      http: res.status,
+      code: data.code,
+      description: msg,
+      account,
+    });
     throw new Error(`[bizppurio] 토큰 발급 실패: ${msg}`);
   }
 
@@ -254,6 +303,7 @@ async function fetchAccessToken(settings) {
     expiresAt: parseExpired(data.expired),
   };
   tokenCacheByAccount.set(account, entry);
+  console.log('[bizppurio] token ok', { url: tokenUrl, account, expired: data.expired });
   return entry;
 }
 
