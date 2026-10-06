@@ -324,6 +324,48 @@ export default function FacilitiesPage() {
     setOpen(true);
   };
 
+  const applyKakaoSettingsDraftToForm = () => {
+    const prevSettings = form.kakaoAlimtalkSettings || emptyKakaoSettings();
+    const draft = kakaoSettingsDraft || emptyKakaoSettings();
+
+    const resellerPw = draft.clearResellerPw
+      ? ''
+      : String(draft.resellerPw || '').trim() || prevSettings.resellerPw || '';
+    const resellerApiKey = draft.clearResellerApiKey
+      ? ''
+      : String(draft.resellerApiKey || '').trim() ||
+        prevSettings.resellerApiKey ||
+        '';
+
+    const nextSettings = {
+      ...emptyKakaoSettings(),
+      ...prevSettings,
+      ...draft,
+      resellerPw,
+      resellerApiKey,
+      clearResellerPw: Boolean(draft.clearResellerPw),
+      clearResellerApiKey: Boolean(draft.clearResellerApiKey),
+      hasResellerPw: draft.clearResellerPw
+        ? false
+        : Boolean(resellerPw || prevSettings.hasResellerPw),
+      hasResellerApiKey: draft.clearResellerApiKey
+        ? false
+        : Boolean(resellerApiKey || prevSettings.hasResellerApiKey),
+      resellerPwLen: draft.clearResellerPw
+        ? 0
+        : resellerPw
+          ? resellerPw.length
+          : Number(prevSettings.resellerPwLen) || 0,
+      resellerApiKeyLen: draft.clearResellerApiKey
+        ? 0
+        : resellerApiKey
+          ? resellerApiKey.length
+          : Number(prevSettings.resellerApiKeyLen) || 0,
+    };
+    setForm((prev) => ({ ...prev, kakaoAlimtalkSettings: nextSettings }));
+    return nextSettings;
+  };
+
   const testKakaoAuth = async () => {
     if (mode !== 'edit' || !form.facilityCode) {
       showToast('시설사를 먼저 등록·수정으로 저장한 뒤 연결 테스트하세요.');
@@ -331,12 +373,21 @@ export default function FacilitiesPage() {
     }
     setKakaoTestResult('연결 테스트 중…');
     try {
-      if (form.kakaoAccountType === 'facility' && form.kakaoAlimtalkSettings) {
+      const settingsToSave = kakaoSettingsOpen
+        ? applyKakaoSettingsDraftToForm()
+        : form.kakaoAlimtalkSettings || emptyKakaoSettings();
+
+      const typedPwLen = String(settingsToSave.resellerPw || '').trim().length;
+      if (typedPwLen > 0) {
+        setKakaoTestResult(`입력한 PW ${typedPwLen}자로 저장 후 테스트 중…`);
+      }
+
+      if (form.kakaoAccountType === 'facility') {
         const saved = await api(
           `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}/kakao-alimtalk-settings`,
           {
             method: 'PUT',
-            body: JSON.stringify(form.kakaoAlimtalkSettings),
+            body: JSON.stringify(settingsToSave),
           },
           'system'
         );
@@ -346,10 +397,25 @@ export default function FacilitiesPage() {
             ...emptyKakaoSettings(),
             ...(prev.kakaoAlimtalkSettings || {}),
             ...saved,
-            resellerPw: prev.kakaoAlimtalkSettings?.resellerPw || '',
+            resellerPw: '',
             resellerApiKey: '',
+            hasResellerPw: Boolean(saved?.hasResellerPw ?? typedPwLen),
+            resellerPwLen: Number(saved?.resellerPwLen) || typedPwLen || 0,
           },
         }));
+        if (kakaoSettingsOpen) {
+          setKakaoSettingsDraft((d) => ({
+            ...d,
+            resellerPw: '',
+            resellerApiKey: '',
+            hasResellerPw: Boolean(saved?.hasResellerPw ?? typedPwLen),
+            hasResellerApiKey: Boolean(saved?.hasResellerApiKey),
+            resellerPwLen: Number(saved?.resellerPwLen) || typedPwLen || 0,
+            resellerApiKeyLen: Number(saved?.resellerApiKeyLen) || 0,
+            clearResellerPw: false,
+            clearResellerApiKey: false,
+          }));
+        }
       }
       const result = await api(
         `/system-admin/facilities/${encodeURIComponent(form.facilityCode)}/kakao-alimtalk-settings/test`,
@@ -358,7 +424,7 @@ export default function FacilitiesPage() {
       );
       const text = result?.ok
         ? `연결 성공 · ${result.provider} · PW ${result.pwLen}자 · 인증키 ${result.apiKeyLen}자`
-        : `연결 실패 · PW ${result?.pwLen ?? 0}자 · 인증키 ${result?.apiKeyLen ?? 0}자\n${result?.message || '인증 오류'}`;
+        : `연결 실패 · 서버 저장 PW ${result?.pwLen ?? 0}자 · 인증키 ${result?.apiKeyLen ?? 0}자\n${result?.message || '인증 오류'}\n\n※ 웹 로그인 암호 글자 수와 같은지 확인하세요. (거절된 PW = ${result?.pwLen ?? 0}자)`;
       setKakaoTestResult(text);
       showToast(result?.ok ? '알림톡 계정 연결 성공' : '알림톡 계정 연결 실패');
       window.alert(text);
@@ -369,65 +435,26 @@ export default function FacilitiesPage() {
       window.alert(text);
     }
   };
+
+  const openKakaoSettings = () => {
     const current = form.kakaoAlimtalkSettings || emptyKakaoSettings();
     setKakaoSettingsDraft({
       ...emptyKakaoSettings(),
       ...current,
-      // 비밀값은 화면에 다시 채우지 않음 (변경 시에만 입력)
       resellerPw: '',
       resellerApiKey: '',
       clearResellerPw: false,
       clearResellerApiKey: false,
     });
+    setKakaoTestResult('');
     setKakaoSettingsOpen(true);
   };
 
   const saveKakaoSettingsDraft = () => {
-    setForm((prev) => {
-      const prevSettings = prev.kakaoAlimtalkSettings || emptyKakaoSettings();
-      const draft = kakaoSettingsDraft || emptyKakaoSettings();
-
-      const resellerPw = draft.clearResellerPw
-        ? ''
-        : String(draft.resellerPw || '').trim() || prevSettings.resellerPw || '';
-      const resellerApiKey = draft.clearResellerApiKey
-        ? ''
-        : String(draft.resellerApiKey || '').trim() ||
-          prevSettings.resellerApiKey ||
-          '';
-
-      return {
-        ...prev,
-        kakaoAlimtalkSettings: {
-          ...emptyKakaoSettings(),
-          ...prevSettings,
-          ...draft,
-          resellerPw,
-          resellerApiKey,
-          clearResellerPw: Boolean(draft.clearResellerPw),
-          clearResellerApiKey: Boolean(draft.clearResellerApiKey),
-          hasResellerPw: draft.clearResellerPw
-            ? false
-            : Boolean(resellerPw || prevSettings.hasResellerPw),
-          hasResellerApiKey: draft.clearResellerApiKey
-            ? false
-            : Boolean(resellerApiKey || prevSettings.hasResellerApiKey),
-          resellerPwLen: draft.clearResellerPw
-            ? 0
-            : resellerPw
-              ? resellerPw.length
-              : Number(prevSettings.resellerPwLen) || 0,
-          resellerApiKeyLen: draft.clearResellerApiKey
-            ? 0
-            : resellerApiKey
-              ? resellerApiKey.length
-              : Number(prevSettings.resellerApiKeyLen) || 0,
-        },
-      };
-    });
+    applyKakaoSettingsDraftToForm();
     setKakaoSettingsOpen(false);
     showToast(
-      '설정이 임시 저장되었습니다. PW 칸이 비어 보여도 정상입니다. 시설사 «수정»으로 최종 반영하세요.'
+      '설정이 임시 저장되었습니다. PW 칸이 비어 보여도 정상입니다. «연결 테스트» 또는 시설사 «수정»으로 확인하세요.'
     );
   };
 
@@ -930,7 +957,8 @@ export default function FacilitiesPage() {
                   ) : null}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <input
-                      type="text"
+                      type={field.secret ? 'password' : 'text'}
+                      autoComplete="new-password"
                       style={{ flex: 1 }}
                       value={kakaoSettingsDraft[field.key] || ''}
                       placeholder={
@@ -968,7 +996,7 @@ export default function FacilitiesPage() {
                   </div>
                 </label>
               ))}
-              <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+              <div className="modal-actions" style={{ justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="btn-ghost"
@@ -976,9 +1004,16 @@ export default function FacilitiesPage() {
                 >
                   닫기
                 </button>
-                <button type="button" className="btn-primary" onClick={saveKakaoSettingsDraft}>
-                  저장
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {mode === 'edit' ? (
+                    <button type="button" className="btn-ghost" onClick={testKakaoAuth}>
+                      연결 테스트
+                    </button>
+                  ) : null}
+                  <button type="button" className="btn-primary" onClick={saveKakaoSettingsDraft}>
+                    저장
+                  </button>
+                </div>
               </div>
             </div>
           </div>

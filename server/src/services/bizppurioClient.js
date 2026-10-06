@@ -111,6 +111,7 @@ function authSecretCandidates(settings, provider = 'bizppurio') {
 /** @type {import('undici').ProxyAgent | null} */
 let proxyAgent = null;
 let proxyLogged = false;
+let proxyFallbackLogged = false;
 
 function getProxyUrl() {
   const host = String(process.env.PROXY_HOST || '').trim();
@@ -131,10 +132,53 @@ function getProxyDispatcher() {
   return proxyAgent;
 }
 
+function formatFetchError(err) {
+  const cause = err?.cause;
+  const parts = [
+    err?.message || String(err),
+    cause?.code,
+    cause?.message,
+    cause?.syscall,
+    cause?.hostname || cause?.address,
+  ].filter(Boolean);
+  return parts.join(' | ');
+}
+
+function isRetryableNetworkError(err) {
+  const msg = `${err?.message || ''} ${err?.cause?.code || ''} ${err?.cause?.message || ''}`;
+  return /fetch failed|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ECONNRESET|UND_ERR|network|socket|timeout/i.test(
+    msg
+  );
+}
+
+/**
+ * PROXY_HOST 있으면 프록시 우선, 네트워크 실패 시 직접 호출 1회 재시도.
+ */
 async function httpFetch(url, options = {}) {
   const dispatcher = getProxyDispatcher();
-  if (dispatcher) return undiciFetch(url, { ...options, dispatcher });
-  return undiciFetch(url, options);
+  try {
+    if (dispatcher) return await undiciFetch(url, { ...options, dispatcher });
+    return await undiciFetch(url, options);
+  } catch (err) {
+    if (dispatcher && isRetryableNetworkError(err)) {
+      if (!proxyFallbackLogged) {
+        proxyFallbackLogged = true;
+        console.warn(
+          `[bizppurio] proxy unreachable (${formatFetchError(err)}) — retrying direct`
+        );
+      }
+      try {
+        return await undiciFetch(url, options);
+      } catch (err2) {
+        const detail = formatFetchError(err2);
+        console.error('[bizppurio] direct fetch also failed', detail);
+        throw new Error(`[bizppurio] 네트워크 오류: ${detail}`);
+      }
+    }
+    const detail = formatFetchError(err);
+    console.error('[bizppurio] fetch failed', { url, detail });
+    throw new Error(`[bizppurio] 네트워크 오류: ${detail}`);
+  }
 }
 
 function parseExpired(expired) {

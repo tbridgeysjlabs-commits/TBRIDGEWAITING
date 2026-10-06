@@ -31,6 +31,7 @@ let tokenCache = {
 /** @type {import('undici').ProxyAgent | null} */
 let proxyAgent = null;
 let proxyLogged = false;
+let proxyFallbackLogged = false;
 
 function apiBase() {
   return (process.env.PPURIO_API_BASE_URL || DEFAULT_PPURIO_API_BASE_URL)
@@ -60,13 +61,38 @@ function getProxyDispatcher() {
   return proxyAgent;
 }
 
-/** undici fetch — PROXY_HOST 있을 때만 dispatcher(proxy) 주입 */
+function formatFetchError(err) {
+  const cause = err?.cause;
+  return [err?.message || String(err), cause?.code, cause?.message]
+    .filter(Boolean)
+    .join(' | ');
+}
+
+function isRetryableNetworkError(err) {
+  const msg = `${err?.message || ''} ${err?.cause?.code || ''} ${err?.cause?.message || ''}`;
+  return /fetch failed|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ECONNRESET|UND_ERR|network|socket|timeout/i.test(
+    msg
+  );
+}
+
+/** undici fetch — 프록시 실패 시 직접 호출 폴백 */
 async function ppurioFetch(url, options = {}) {
   const dispatcher = getProxyDispatcher();
-  if (dispatcher) {
-    return undiciFetch(url, { ...options, dispatcher });
+  try {
+    if (dispatcher) return await undiciFetch(url, { ...options, dispatcher });
+    return await undiciFetch(url, options);
+  } catch (err) {
+    if (dispatcher && isRetryableNetworkError(err)) {
+      if (!proxyFallbackLogged) {
+        proxyFallbackLogged = true;
+        console.warn(
+          `[ppurio] proxy unreachable (${formatFetchError(err)}) — retrying direct`
+        );
+      }
+      return undiciFetch(url, options);
+    }
+    throw err;
   }
-  return undiciFetch(url, options);
 }
 
 export function isPpurioConfigured() {
